@@ -150,20 +150,13 @@ Organizing streamed stock data for each stock each day, storing indicators and p
 
 ---
 
-### ✅ Jupyter Notebook Summary
-Analyzing buy signal performance by average return and win rate, across multiple return timelines:
-![Average Return](screenshots/jupyter_buy_signals_avg_return.png)
-![Win Rate](screenshots/jupyter_buy_signals_win_rate.png)
-
----
-
 ### ✅ Airflow DAG Graph View
 This shows a successful run of the end-to-end pipeline:
 ![Airflow DAG Graph View](screenshots/airflow_graph.png)
 
 ---
 
-### ✅ Jupyter Notebook Summary
+### ✅ Jupyter Notebook Analysis
 Analyzing buy signal performance by average return and win rate, across multiple return timelines:
 ![Average Return](screenshots/jupyter_buy_signals_avg_return.png)
 ![Win Rate](screenshots/jupyter_buy_signals_win_rate.png)
