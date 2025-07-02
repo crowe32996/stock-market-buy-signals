@@ -27,7 +27,7 @@ This project implements a daily stock market data pipeline using:
 ### 1. Clone the repo
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/crowe32996/stock-market-buy-signals
 cd kafka-stock-market-pipeline
 ```
 
