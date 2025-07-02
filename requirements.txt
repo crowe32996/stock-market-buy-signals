@@ -1,0 +1,12 @@
+aiohttp==3.11.14
+alembic==1.15.1
+apache-airflow==2.10.5
+apache-airflow-providers-http==5.2.1
+apache-airflow-providers-postgres==6.1.1
+apache-airflow-providers-smtp==2.0.1
+kafka-python==2.2.4
+psycopg2-binary==2.9.10
+pandas==2.2.3
+requests==2.32.3
+matplotlib==3.9.0
+jupyterlab==4.2.1
