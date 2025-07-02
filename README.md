@@ -135,11 +135,13 @@ GitHub: crowe32996
 ## Screenshots
 
 ### ✅ Kafka for Streaming Data from Alpha Vantage API
-Streaming stock values from Alpha Vantage API and calculating indicators:
+Streaming/producing stock values from Alpha Vantage API:
+![Producer Opening](screenshots/kafka_producer_opening.png)
+![Producer Closing](screenshots/kafka_producer_closing.png)
+
+Consuming stock data and calculating indicators:
 ![Consumer Opening](screenshots/kafka_consumer_opening.png)
 ![Consumer Closing](screenshots/kafka_consumer_closing.png)
-![Producer Opening](screenshots/kafka_producer_opening.png)
-![Consumer Closing](screenshots/kafka_producer_closing.png)
 
 ---
 
