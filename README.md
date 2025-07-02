@@ -129,7 +129,7 @@ Note: Sample sizes are currently small and results are preliminary. Data volume 
 MIT License © Charlie Rowe
 
 ## Contact
-Questions? Email: cwr321@example.com
+Questions? Email: cwr321@gmail.com
 GitHub: crowe32996
 
 ## Screenshots
@@ -175,6 +175,3 @@ Example of emailed resulting stock data with computed indicators:
 ![CSV Output](screenshots/email_stock_buy_signals.png)
 
 
-
-## Notes
-This project runs on an AWS EC2 instance with multiple services (Kafka, PostgreSQL, Airflow). It requires coordination and setup, but provides a solid example of a production-like stock data pipeline.
