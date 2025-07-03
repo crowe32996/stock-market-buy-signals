@@ -3,19 +3,30 @@ import time
 import json
 import requests
 from kafka import KafkaProducer
+from kafka import KafkaProducer
+from kafka.errors import NoBrokersAvailable
+import time
+
 
 # Configuration
 API_KEY = 'M1D7S2117PSVU5OW'  # Ensure you set your API key as an environment variable
 ALPHA_VANTAGE_URL = "https://www.alphavantage.co/query"
-KAFKA_BROKER = '172.31.38.186:9092'  # Your Kafka broker
+KAFKA_BROKER = 'kafka:9092'  # Your Kafka broker
 TOPIC = 'stock_data'  # Kafka topic where the stock data will be sent
 MAX_REQUESTS_PER_DAY = 25  # Alpha Vantage free limit
 
 # Initialize Kafka producer
-producer = KafkaProducer(
-    bootstrap_servers=[KAFKA_BROKER],
-    value_serializer=lambda v: json.dumps(v).encode('utf-8')
-)
+for attempt in range(10):  # retry up to 10 times
+    try:
+        producer = KafkaProducer(bootstrap_servers=[KAFKA_BROKER], value_serializer=lambda v: json.dumps(v).encode('utf-8'))
+        print("Connected to Kafka!")
+        break
+    except NoBrokersAvailable:
+        print(f"Kafka not available yet (attempt {attempt+1}), retrying...")
+        time.sleep(3)
+else:
+    raise Exception("Failed to connect to Kafka after 10 attempts")
+
 
 # Variable to track the number of requests made today
 request_count = 0

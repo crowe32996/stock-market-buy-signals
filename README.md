@@ -13,24 +13,25 @@ A buy signal is triggered when all of the following conditions are met:
 
 - Closing price > 10-day SMA: The current closing price is above the 10-day SMA, showing strength and confirming the recent positive momentum.
 
-The stock results are analyzed in buy_signal_result_analysis.ipynb, comparing how the stocks trended over different time horizons after the buy_signal field was marked "True" or "False". This use case looks specifically at three stocks (NVDA, MSFT, TSLA) to manage API request limits, but future iterations will include a larger number of stocks.
+Historical outcomes are analyzed in the Jupyter notebook buy_signal_result_analysis.ipynb. This version tracks three stocks (NVDA, MSFT, TSLA) to stay within free API limits.
+
 
 ---
 
 ## Stock Buy Signal Average Returns
-Early results show a sign of buy signals leading to larger average returns, for the 5-day time horizon and beyond:
+Early results show that buy signals are effective in realizing stronger average returns, particularly over 5+ day horizons.
 ![Average Return](screenshots/jupyter_buy_signals_avg_return.png)
 ---
 
 ## Architecture
 
-1. **EC2 Instance**: Hosts all services — Kafka, Airflow, PostgreSQL, and pipeline scripts — for a production-like cloud environment.
+1. **Dockerized Environment**: The entire stack (Airflow, Kafka, PostgreSQL, and pipeline scripts) runs inside Docker containers using Docker Compose for easy, consistent setup.
 2. **Kafka Producer**: Fetches daily stock data for a list of symbols from Alpha Vantage and publishes to a Kafka topic.
 3. **Kafka Consumer**: Reads stock data from Kafka, stores it in PostgreSQL, and computes technical indicators (SMA, RSI, MACD, buy signals).
 4. **PostgreSQL Database**: Stores raw stock data and calculated indicators for analysis and reporting.
-5. **Airflow DAG**: Orchestrates running producer, consumer, fetching results, and emailing reports.
+5. **Airflow DAG**: Orchestrates running the producer, consumer, fetching results, and emailing reports.
 6. **Email Notification**: Sends a daily report with stock data and computed signals.
-7. **Jupyter Notebook**: Analyzes historical stock prices after both buy_signal is marked True and False, to determine effectiveness of the assigned signals.
+7. **Jupyter Notebook**: Analyzes historical stock prices after both `buy_signal` True and False to determine the effectiveness of the signals.
 
 ---
 ## Screenshots
@@ -78,53 +79,47 @@ git clone https://github.com/crowe32996/stock-market-buy-signals
 cd stock-market-buy-signals
 ```
 
-### 2. Install dependencies
+### 2. Configure Alpha Vantage API Key
 
-Make sure you have Python 3.8+ installed.
+- Get a free API key from Alpha Vantage
+
+- Open dags/scripts/producer.py and replace the API_KEY value.
+
+
+### 3. Build and start the Docker containers
+
+This will:
+- Start Kafka, Postgres, and Airflow (webserver + scheduler)
+
+- Automatically create the stock_market_av database and stock_data table schema
 
 ```bash
-pip install -r requirements.txt
+docker-compose up -d --build
 ```
-(Requirements include kafka-python, psycopg2-binary, pandas, apache-airflow, etc.)
 
-### 3. Setup Kafka
+### 4. Initialize Airflow (First Time Only)
 
-- Install Kafka locally or on EC2 instance
+Replace the following with your chosen credentials:
 
-- Create Kafka topic stock_data
+```bash
+docker-compose run airflow-webserver db init
 
-### 4. Setup PostgreSQL
+docker-compose run airflow-webserver users create --username admin --password admin --firstname Charlie --lastname Rowe --role Admin --email cwr321@gmail.com
+```
 
-- Create database stock_market_av
+### 5. Access the Airflow UI
+Open your browser and go to http://localhost:8080, then log in with your new user credentials.
 
-- Run the provided SQL schema to create tables
+Trigger the DAG kafka_stock_pipeline. Each run will:
+- Run the Kafka producer to fetch daily stock data
 
-### 5. Configure Alpha Vantage API Key
+- Process and store the data in Postgres
 
-- Get free API key from Alpha Vantage
+- Generate indicators + buy signal
 
-- Set your API key in producer.py or use environment variables
+- Save results to CSV
 
-### 6. Configure Airflow
-
-- Initialize Airflow DB: airflow db init
-
-- Place DAG file in Airflow’s dags folder
-
-- Start Airflow scheduler and webserver
-
-## Running the Pipeline
-- Trigger the DAG kafka_stock_pipeline manually via Airflow UI or schedule daily
-
-DAG runs:
-
-- Kafka producer fetches stock data
-
-- Kafka consumer stores data and computes indicators
-
-- Results fetched from PostgreSQL and saved as CSV
-
-- Email with report sent automatically
+- Email the stock summary (Update recipient email in dags/kafka_stock_dag.py)
 
 ## Data and Indicators
 Stocks: Example symbols include MSFT, TSLA, NVDA
@@ -160,10 +155,6 @@ Note: Sample sizes are currently small and results are preliminary. Data volume 
 - Improve buy signal logic and backtesting
 
 - Add visual dashboards for ongoing performance
-
-- Deploy with containerization (Docker + Kubernetes)
-
-- Optimize Airflow DAG for parallelism and retries
 
 ## How to Contribute
 - Fork the repo and create feature branches

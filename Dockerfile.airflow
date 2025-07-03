@@ -1,0 +1,32 @@
+FROM python:3.10-slim
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    curl \
+    default-libmysqlclient-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV AIRFLOW_HOME=/opt/airflow
+
+# Create airflow user early
+RUN useradd -ms /bin/bash airflow
+
+# Create airflow home and nested logs directories BEFORE switching user
+RUN mkdir -p $AIRFLOW_HOME/logs/scheduler && \
+    chown -R airflow:airflow $AIRFLOW_HOME && \
+    chmod -R 755 $AIRFLOW_HOME
+
+WORKDIR $AIRFLOW_HOME
+
+COPY dags/ ./dags/
+COPY requirements.txt ./requirements.txt
+
+RUN pip install --upgrade pip
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Switch to airflow user only AFTER ownership is correctly set
+USER airflow
+
+ENTRYPOINT ["airflow"]
+CMD ["webserver"]

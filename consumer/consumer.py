@@ -5,20 +5,38 @@ from kafka import KafkaConsumer
 import json
 from datetime import datetime
 import time
+from kafka import KafkaConsumer
+from kafka.errors import NoBrokersAvailable
+import time
+import os
 
-# Kafka Consumer: exits after 10s idle if no new messages
-consumer = KafkaConsumer(
-    'stock_data',
-    group_id='stock-consumer-group',
-    bootstrap_servers=['localhost:9092'],
-    auto_offset_reset='earliest',
-    enable_auto_commit=False,
-    consumer_timeout_ms=10000,  # Exit if no new messages in 10 sec
-    value_deserializer=lambda x: json.loads(x.decode('utf-8'))
-)
+for attempt in range(10):
+    try:
+        consumer = KafkaConsumer(
+            'stock_data',
+            group_id='stock-consumer-group',
+            bootstrap_servers=['kafka:9092'],
+            auto_offset_reset='earliest',
+            enable_auto_commit=False,
+            consumer_timeout_ms=10000,  # Exit if no new messages in 10 sec
+            value_deserializer=lambda x: json.loads(x.decode('utf-8'))
+        )
+        print("Connected to Kafka!")
+        break
+    except NoBrokersAvailable:
+        print(f"Kafka not available yet (attempt {attempt+1}), retrying...")
+        time.sleep(3)
+else:
+    raise Exception("Failed to connect to Kafka after 10 attempts")
 
 # PostgreSQL Connection
-conn = psycopg2.connect("dbname=stock_market_av user=ec2-user password=Lefevre102!")
+conn = psycopg2.connect(
+    dbname=os.getenv("POSTGRES_DB", "stock_market_av"),
+    user=os.getenv("POSTGRES_USER", "ec2-user"),
+    password=os.getenv("POSTGRES_PASSWORD", "Lefevre102!"),
+    host=os.getenv("POSTGRES_HOST", "postgres"),
+    port=5432
+)
 cursor = conn.cursor()
 
 def store_stock_data(record):

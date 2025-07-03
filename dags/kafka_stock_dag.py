@@ -8,6 +8,7 @@ import psycopg2
 import logging
 import sys
 import os
+import csv
 
 default_args = {
     'owner': 'airflow',
@@ -37,7 +38,7 @@ def run_producer():
     try:
         print_env_info()
         result = subprocess.run(
-            ["/home/ec2-user/airflow_env/bin/python3", "/home/ec2-user/kafka-stock-market/producer.py"],
+            ["python3", "/opt/airflow/dags/scripts/producer.py"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -60,7 +61,7 @@ def run_consumer():
     try:
         print_env_info()
         result = subprocess.run(
-            ["/home/ec2-user/airflow_env/bin/python3", "/home/ec2-user/kafka-stock-market/consumer.py"],
+            ["python3", "/opt/airflow/dags/scripts/consumer.py"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -84,7 +85,7 @@ def fetch_stock_data():
         dbname="stock_market_av",
         user="ec2-user",
         password="Lefevre102!",
-        host="localhost",
+        host="postgres",
         port="5432"
     )
     cursor = conn.cursor()
@@ -97,7 +98,7 @@ def fetch_stock_data():
         'volume', 'date', 'SMA_10', 'SMA_50', 'RSI', 'MACD', 'Signal', 'buy_signal'
     ]
 
-    result_file = "/home/ec2-user/stock_results.csv"
+    result_file = "/opt/airflow/volumes/output/stock_results.csv" 
     with open(result_file, mode="w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(headers)
@@ -129,7 +130,7 @@ email_task = EmailOperator(
     to='cwr321@gmail.com',
     subject='Stock Data Report',
     html_content='Attached is the latest stock data.',
-    files=['/home/ec2-user/stock_buy_signals.csv'],
+    files=['/opt/airflow/volumes/output/stock_results.csv'],
     trigger_rule=TriggerRule.ALL_DONE,
     dag=dag,
 )
