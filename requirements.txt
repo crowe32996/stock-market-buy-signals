@@ -9,3 +9,4 @@ pandas>=1.5,<3.0
 requests>=2.28,<3.0
 matplotlib>=3.6,<4.0
 jupyterlab>=3.0,<5.0
+seaborn

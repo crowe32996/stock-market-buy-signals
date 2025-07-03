@@ -98,13 +98,36 @@ def fetch_stock_data():
         'volume', 'date', 'SMA_10', 'SMA_50', 'RSI', 'MACD', 'Signal', 'buy_signal'
     ]
 
-    result_file = "/opt/airflow/volumes/output/stock_results.csv" 
+    result_file = "/opt/airflow/volumes/output/stock_buy_signals.csv" 
     with open(result_file, mode="w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(headers)
         writer.writerows(rows)
 
     return result_file
+
+def run_analysis():
+    try:
+        print_env_info()
+        result = subprocess.run(
+            ["python3", "/opt/airflow/dags/scripts/analyze_buy_signals.py"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True,
+            timeout=120
+        )
+        logging.info(f"[Analysis STDOUT]\n{result.stdout}")
+        logging.error(f"[Analysis STDERR]\n{result.stderr}")
+    except subprocess.TimeoutExpired:
+        logging.error("Analysis script timed out after 120 seconds")
+        raise
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Analysis error (non-zero exit): {e.stderr}")
+        raise
+    except Exception as ex:
+        logging.error(f"Unexpected error running analysis: {str(ex)}")
+        raise
 
 producer_task = PythonOperator(
     task_id='run_kafka_producer',
@@ -125,14 +148,26 @@ fetch_task = PythonOperator(
     trigger_rule=TriggerRule.ALL_SUCCESS,
 )
 
+analysis_task = PythonOperator(
+    task_id='run_analysis_script',
+    python_callable=run_analysis,
+    dag=dag,
+    trigger_rule=TriggerRule.ALL_SUCCESS,
+)
+
 email_task = EmailOperator(
     task_id='send_email',
     to='cwr321@gmail.com',
     subject='Stock Data Report',
     html_content='Attached is the latest stock data.',
-    files=['/opt/airflow/volumes/output/stock_results.csv'],
+    files=[
+        '/opt/airflow/volumes/output/stock_buy_signals.csv',
+        '/opt/airflow/volumes/output/avg_return_by_buy_signal.png',
+        '/opt/airflow/volumes/output/win_rate_by_buy_signal.png'
+    ],
     trigger_rule=TriggerRule.ALL_DONE,
     dag=dag,
 )
 
-producer_task >> consumer_task >> fetch_task >> email_task
+
+producer_task >> consumer_task >> fetch_task >> analysis_task >> email_task

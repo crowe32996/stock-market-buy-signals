@@ -9,7 +9,7 @@ import time
 
 
 # Configuration
-API_KEY = 'M1D7S2117PSVU5OW'  # Ensure you set your API key as an environment variable
+API_KEY = '6C6LVKV6DQPBEAAW'  # Ensure you set your API key as an environment variable
 ALPHA_VANTAGE_URL = "https://www.alphavantage.co/query"
 KAFKA_BROKER = 'kafka:9092'  # Your Kafka broker
 TOPIC = 'stock_data'  # Kafka topic where the stock data will be sent
