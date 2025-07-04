@@ -1,4 +1,4 @@
-# Stock Market Daily Buy Signal Indicator
+# Stock Technical Indicator Analysis
 
 ## Overview
 
@@ -13,7 +13,7 @@ A buy signal is triggered when all of the following conditions are met:
 
 - Closing price > 10-day SMA: The current closing price is above the 10-day SMA, showing strength and confirming the recent positive momentum.
 
-This version tracks three stocks (NVDA, MSFT, TSLA) to stay within free API limits, but future iterations will include a larger population of stock symbols.
+This version tracks three stocks (NVDA, MSFT, TSLA) to stay within free API limits, but future iterations will include a larger population of stock symbols, to get a larger sample size in determining the effectiveness in these indicators in predicting future success.
 
 
 ---
