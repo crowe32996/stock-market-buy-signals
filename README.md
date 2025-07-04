@@ -1,4 +1,4 @@
-# Kafka Stock Market Pipeline
+# Stock Market Daily Buy Signal Indicator
 
 ## Overview
 
