@@ -5,15 +5,15 @@
 This project is a production-style pipeline that generates automated buy signal alerts for selected stocks and evaluates the effectiveness of technical indicators in predicting future performance. 
 
 A buy signal is triggered when all of the following conditions are met:
-- MACD > Signal line: The MACD line (difference between the 12-day and 26-day EMAs) is above its 9-day EMA signal line, indicating positive momentum.
+- MACD > Signal line: The Moving Average Convergence/Divergence line (difference between the 12-day and 26-day Exponential Moving Averages/EMA) is above its 9-day EMA signal line, indicating positive momentum.
 
 - RSI < 65: The Relative Strength Index is below 65, meaning the stock is not yet overbought and has room to grow.
 
-- 10-day SMA > 50-day SMA: The short-term trend (10-day Simple Moving Average) is above the longer-term trend (50-day SMA), indicating an upward trend.
+- 10-day SMA > 50-day SMA: The 10-day Simple Moving Average is above the longer-term 50-day SMA, indicating an upward trend.
 
 - Closing price > 10-day SMA: The current closing price is above the 10-day SMA, showing strength and confirming the recent positive momentum.
 
-Historical outcomes are analyzed in the Jupyter notebook buy_signal_result_analysis.ipynb. This version tracks three stocks (NVDA, MSFT, TSLA) to stay within free API limits.
+This version tracks three stocks (NVDA, MSFT, TSLA) to stay within free API limits, but future iterations will include a larger population of stock symbols.
 
 
 ---
@@ -36,7 +36,7 @@ Early results show that buy signals are effective in realizing stronger average 
 ---
 ## Screenshots
 
-### ✅ Kafka for Streaming Data from Alpha Vantage API
+### Kafka for Streaming Data from Alpha Vantage API
 Streaming/producing stock values from Alpha Vantage API:
 ![Producer Opening](screenshots/kafka_producer_opening.png)
 ![Producer Closing](screenshots/kafka_producer_closing.png)
@@ -47,26 +47,26 @@ Consuming stock data and calculating indicators:
 
 ---
 
-### ✅ Postgres for Structuring and Storing Stock Data
+### Postgres for Structuring and Storing Stock Data
 Organizing streamed stock data for each stock each day, storing indicators and potential buy signals:
 ![Postgres Structure](screenshots/postgres_db_structure.png)
 ![Postgres Data](screenshots/postgres_db_data.png)
 
 ---
 
-### ✅ Airflow DAG Graph View
+### Airflow DAG Graph View
 This shows a successful run of the end-to-end pipeline:
 ![Airflow DAG Graph View](screenshots/airflow_graph.png)
 
 ---
 
-### ✅ Buy Signal Analysis
+### Buy Signal Analysis
 Analyzing buy signal performance by average return (shown at the top) and win rate, across multiple return timelines:
 ![Win Rate](screenshots/win_rate_by_buy_signal.png)
 
 ---
 
-### ✅ Sample Email Output
+### Sample Email Output
 Example of emailed resulting stock data with computed indicators:
 ![CSV Output](screenshots/email_stock_buy_signals.png)
 
