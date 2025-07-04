@@ -14,7 +14,7 @@ for attempt in range(10):
     try:
         consumer = KafkaConsumer(
             'stock_data',
-            group_id='new_consumer_group',
+            group_id='stock_consumer_group',
             bootstrap_servers=['kafka:9092'],
             auto_offset_reset='earliest',
             enable_auto_commit=False,
