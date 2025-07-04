@@ -20,7 +20,7 @@ Historical outcomes are analyzed in the Jupyter notebook buy_signal_result_analy
 
 ## Stock Buy Signal Average Returns
 Early results show that buy signals are effective in realizing stronger average returns, particularly over 5+ day horizons.
-![Average Return](screenshots/jupyter_buy_signals_avg_return.png)
+![Average Return](screenshots/avg_return_by_buy_signal.png)
 ---
 
 ## Architecture
@@ -60,9 +60,9 @@ This shows a successful run of the end-to-end pipeline:
 
 ---
 
-### ✅ Jupyter Notebook Analysis
+### ✅ Buy Signal Analysis
 Analyzing buy signal performance by average return (shown at the top) and win rate, across multiple return timelines:
-![Win Rate](screenshots/jupyter_buy_signals_win_rate.png)
+![Win Rate](screenshots/win_rate_by_buy_signal.png)
 
 ---
 
