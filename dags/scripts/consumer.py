@@ -9,6 +9,10 @@ from kafka import KafkaConsumer
 from kafka.errors import NoBrokersAvailable
 import time
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 for attempt in range(10):
     try:
@@ -29,13 +33,18 @@ for attempt in range(10):
 else:
     raise Exception("Failed to connect to Kafka after 10 attempts")
 
-# PostgreSQL Connection
+POSTGRES_DB = os.environ["POSTGRES_DB"]
+POSTGRES_USER = os.environ["POSTGRES_USER"]
+POSTGRES_PASSWORD = os.environ["POSTGRES_PASSWORD"]
+POSTGRES_HOST = os.environ["POSTGRES_HOST"]
+POSTGRES_PORT = os.getenv("POSTGRES_PORT", 5432)
+
 conn = psycopg2.connect(
-    dbname=os.getenv("POSTGRES_DB", "stock_market_av"),
-    user=os.getenv("POSTGRES_USER", "ec2-user"),
-    password=os.getenv("POSTGRES_PASSWORD", "Lefevre102!"),
-    host=os.getenv("POSTGRES_HOST", "postgres"),
-    port=5432
+    dbname=POSTGRES_DB,
+    user=POSTGRES_USER,
+    password=POSTGRES_PASSWORD,
+    host=POSTGRES_HOST,
+    port=POSTGRES_PORT
 )
 cursor = conn.cursor()
 

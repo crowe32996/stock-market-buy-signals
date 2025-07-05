@@ -13,16 +13,18 @@ services:
     volumes:
       - ./dags:/opt/airflow/dags
       - ./output:/opt/airflow/volumes/output
+    env_file: .env
     environment:
-      - AIRFLOW__WEBSERVER__SECRET_KEY=your-very-secure-random-string
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://ec2-user:Lefevre102!@postgres:5432/stock_market_av
-      - AIRFLOW__WEBSERVER__BASE_URL=http://localhost:8080
       - AIRFLOW__WEBSERVER__WEB_SERVER_HOST=0.0.0.0
+      - AIRFLOW__WEBSERVER__WEB_SERVER_PORT=8080
+      - AIRFLOW__WEBSERVER__BASE_URL=http://localhost:8080
     command: webserver
     networks:
-      - airflow_network
+      airflow_network:
+        aliases:
+          - airflow-webserver
 
   airflow-scheduler:
     build:
@@ -34,20 +36,15 @@ services:
     volumes:
       - ./dags:/opt/airflow/dags
       - ./output:/opt/airflow/volumes/output
+    env_file: .env
     environment:
       - AIRFLOW__SMTP__SMTP_HOST=smtp.gmail.com
       - AIRFLOW__SMTP__SMTP_PORT=587
-      - AIRFLOW__SMTP__SMTP_USER=cwr321@gmail.com
-      - AIRFLOW__SMTP__SMTP_PASSWORD=twzfbehvzhleafze
-      - AIRFLOW__SMTP__SMTP_MAIL_FROM=cwr321@gmail.com
       - AIRFLOW__SMTP__SMTP_STARTTLS=True
       - AIRFLOW__SMTP__SMTP_SSL=False
-      - AIRFLOW__WEBSERVER__SECRET_KEY=your-very-secure-random-string
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://ec2-user:Lefevre102!@postgres:5432/stock_market_av
       - AIRFLOW__WEBSERVER__BASE_URL=http://localhost:8080
-      - AIRFLOW__WEBSERVER__WEB_SERVER_HOST=0.0.0.0
     command: scheduler
     networks:
       - airflow_network
@@ -85,10 +82,7 @@ services:
     container_name: postgres
     ports:
       - "5432:5432"
-    environment:
-      - POSTGRES_DB=stock_market_av
-      - POSTGRES_USER=ec2-user
-      - POSTGRES_PASSWORD=Lefevre102!
+    env_file: .env
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql

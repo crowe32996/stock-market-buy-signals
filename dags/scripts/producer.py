@@ -6,17 +6,17 @@ from kafka import KafkaProducer
 from kafka import KafkaProducer
 from kafka.errors import NoBrokersAvailable
 import time
+import os
+from dotenv import load_dotenv
 
-
-# Configuration
-API_KEY = '6C6LVKV6DQPBEAAW'  # Ensure you set your API key as an environment variable
+load_dotenv()
+API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 ALPHA_VANTAGE_URL = "https://www.alphavantage.co/query"
-KAFKA_BROKER = 'kafka:9092'  # Your Kafka broker
-TOPIC = 'stock_data'  # Kafka topic where the stock data will be sent
+KAFKA_BROKER = 'kafka:9092' 
+TOPIC = 'stock_data'  
 MAX_REQUESTS_PER_DAY = 25  # Alpha Vantage free limit
 
-# Initialize Kafka producer
-for attempt in range(10):  # retry up to 10 times
+for attempt in range(10):  
     try:
         producer = KafkaProducer(bootstrap_servers=[KAFKA_BROKER], value_serializer=lambda v: json.dumps(v).encode('utf-8'))
         print("Connected to Kafka!")
@@ -27,11 +27,9 @@ for attempt in range(10):  # retry up to 10 times
 else:
     raise Exception("Failed to connect to Kafka after 10 attempts")
 
-
-# Variable to track the number of requests made today
+# Track number of API requests
 request_count = 0
 
-# Load the current request count from a file (optional, can be persistent)
 def load_request_count():
     global request_count
     try:
@@ -42,7 +40,6 @@ def load_request_count():
         request_count = 0
         print(f"Request count file not found. Starting from 0.")  # Debugging output
 
-# Save the request count to a file (optional, to persist across script runs)
 def save_request_count():
     global request_count
     with open("request_count.txt", "w") as f:
@@ -102,12 +99,11 @@ def produce_stock_data(symbol):
                 print(f"Sent data for {symbol} on {date}")
             except Exception as e:
                 print(f"Error sending data for {symbol} on {date}: {e}")
-            time.sleep(0.5)  # To respect API rate limits
+            time.sleep(0.5)  # To manage API rate limits
 if __name__ == "__main__":
     load_request_count()
     symbols = ['MSFT','TSLA','NVDA']  # Example stock symbols
 
-    # Add a loop to go through each symbol
     for symbol in symbols:
         if not can_make_request():
             print(f"Max API requests reached. Stopping producer.")
