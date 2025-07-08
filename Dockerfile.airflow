@@ -9,13 +9,14 @@ RUN apt-get update && apt-get install -y \
 
 ENV AIRFLOW_HOME=/opt/airflow
 
-# Create airflow user early
-RUN useradd -ms /bin/bash airflow
+# Create airflow group and user with UID and GID 50000
+RUN groupadd -g 50000 airflow && \
+    useradd -ms /bin/bash -u 50000 -g airflow airflow
 
-# Create airflow home and nested logs directories BEFORE switching user
-RUN mkdir -p $AIRFLOW_HOME/logs/scheduler && \
-    chown -R airflow:airflow $AIRFLOW_HOME && \
-    chmod -R 755 $AIRFLOW_HOME
+# Create logs directory with correct ownership and permissions
+RUN mkdir -p /opt/airflow/logs/scheduler && \
+    chown -R 50000:50000 /opt/airflow/logs && \
+    chmod -R 755 /opt/airflow/logs
 
 WORKDIR $AIRFLOW_HOME
 

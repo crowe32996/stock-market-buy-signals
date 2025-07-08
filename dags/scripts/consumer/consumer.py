@@ -13,13 +13,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+KAFKA_BROKER = os.getenv('KAFKA_BROKER', 'host.docker.internal:9092')
+
 
 for attempt in range(10):
     try:
         consumer = KafkaConsumer(
             'stock_data',
             group_id='stock_consumer_group',
-            bootstrap_servers=['kafka:9092'],
+            bootstrap_servers=[KAFKA_BROKER],
             auto_offset_reset='earliest',
             enable_auto_commit=False,
             consumer_timeout_ms=10000,  # Exit if no new messages in 10 sec

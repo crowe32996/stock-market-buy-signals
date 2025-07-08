@@ -12,7 +12,9 @@ from dotenv import load_dotenv
 load_dotenv()
 API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 ALPHA_VANTAGE_URL = "https://www.alphavantage.co/query"
-KAFKA_BROKER = 'kafka:9092' 
+#KAFKA_BROKER = 'host.docker.internal:9092'
+KAFKA_BROKER = os.getenv('KAFKA_BROKER', 'host.docker.internal:9092')
+
 TOPIC = 'stock_data'  
 MAX_REQUESTS_PER_DAY = 25  # Alpha Vantage free limit
 
@@ -102,7 +104,7 @@ def produce_stock_data(symbol):
             time.sleep(0.5)  # To manage API rate limits
 if __name__ == "__main__":
     load_request_count()
-    symbols = ['MSFT','TSLA','NVDA']  # Example stock symbols
+    symbols = ['MSFT','TSLA','NVDA','PLTR','META','GOOGL']  # Example stock symbols
 
     for symbol in symbols:
         if not can_make_request():

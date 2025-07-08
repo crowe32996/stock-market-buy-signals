@@ -43,7 +43,7 @@ def run_producer():
             stderr=subprocess.PIPE,
             text=True,
             check=True,
-            timeout=300
+            timeout=800
         )
         logging.info(f"[Producer STDOUT]\n{result.stdout}")
         logging.error(f"[Producer STDERR]\n{result.stderr}")

@@ -1,0 +1,147 @@
+executor: LocalExecutor
+
+images:
+  airflow:
+    repository: airflow-kubes
+    tag: latest
+    pullPolicy: IfNotPresent
+
+podSecurityContext:
+  fsGroup: 50000
+  runAsUser: 50000
+  runAsGroup: 50000
+
+airflow:
+  extraInitContainers:
+    - name: fix-volume-logs-permissions
+      image: busybox
+      command: [ "sh", "-c", "chown -R 50000:0 /opt/airflow/logs/" ]
+      securityContext:
+        runAsUser: 0
+      volumeMounts:
+        - mountPath: /opt/airflow/logs/
+          name: logs
+  config:
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://ec2-user:Lefevre102!@postgres-service.airflow:5432/stock_market_av
+    AIRFLOW__SMTP__SMTP_HOST: smtp.gmail.com
+    AIRFLOW__SMTP__SMTP_PORT: 587
+    AIRFLOW__SMTP__SMTP_STARTTLS: "True"
+    AIRFLOW__SMTP__SMTP_SSL: "False"
+    AIRFLOW__SMTP__SMTP_USER: cwr321@gmail.com
+    AIRFLOW__SMTP__SMTP_PASSWORD: twzfbehvzhleafze
+    AIRFLOW__SMTP__SMTP_MAIL_FROM: cwr321@gmail.com
+
+    # Disable fab auth manager to avoid warning
+    core:
+      auth_manager: ""
+
+  webserver:
+    secretKey: "your-static-webserver-secret-key-goes-here"
+    securityContext:
+      runAsUser: 50000
+      runAsGroup: 50000
+    extraVolumes:
+      - name: logs
+        emptyDir: {}
+    extraVolumeMounts:
+      - name: logs
+        mountPath: /opt/airflow/logs
+    initContainers:
+      - name: init-permissions
+        image: airflow-kubes:latest
+        command: ["sh", "-c", "chown -R 50000:50000 /opt/airflow/logs"]
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+        volumeMounts:
+          - name: logs
+            mountPath: /opt/airflow/logs
+
+  scheduler:
+    securityContext:
+      runAsUser: 50000
+      runAsGroup: 50000
+    extraVolumes:
+      - name: logs
+        emptyDir: {}
+    extraVolumeMounts:
+      - name: logs
+        mountPath: /opt/airflow/logs
+    initContainers:
+      - name: init-permissions
+        image: airflow-kubes:latest
+        command: ["sh", "-c", "chown -R 50000:50000 /opt/airflow/logs"]
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+        volumeMounts:
+          - name: logs
+            mountPath: /opt/airflow/logs
+
+  triggerer:
+    securityContext:
+      runAsUser: 50000
+      runAsGroup: 50000
+    extraVolumes:
+      - name: logs
+        emptyDir: {}
+    extraVolumeMounts:
+      - name: logs
+        mountPath: /opt/airflow/logs
+    initContainers:
+      - name: init-permissions
+        image: airflow-kubes:latest
+        command: ["sh", "-c", "chown -R 50000:50000 /opt/airflow/logs"]
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+        volumeMounts:
+          - name: logs
+            mountPath: /opt/airflow/logs
+
+  dagProcessor:
+    securityContext:
+      runAsUser: 50000
+      runAsGroup: 50000
+    extraVolumes:
+      - name: logs
+        emptyDir: {}
+    extraVolumeMounts:
+      - name: logs
+        mountPath: /opt/airflow/logs
+    initContainers:
+      - name: init-permissions
+        image: airflow-kubes:latest
+        command: ["sh", "-c", "chown -R 50000:50000 /opt/airflow/logs"]
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+        volumeMounts:
+          - name: logs
+            mountPath: /opt/airflow/logs
+
+dags:
+  persistence:
+    enabled: false
+
+logs:
+  persistence:
+    enabled: false  # use emptyDir for logs, no PVC
+
+waitForMigrations:
+  enabled: true
+  command: ["airflow"]
+  args: ["db", "check-migrations", "--migration-wait-timeout=60"]
+
+postgresql:
+  enabled: false
+
+webserver:
+  service:
+    type: LoadBalancer
+
+createUserJob:
+  useHelmHooks: false
+
+migrateDatabaseJob:
+  useHelmHooks: false
