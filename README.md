@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project is a production-style pipeline that generates automated buy signal alerts for selected stocks and evaluates the effectiveness of technical indicators in predicting future performance. 
+This project is a data pipeline that generates automated buy signal alerts for selected stocks and evaluates the effectiveness of technical indicators in predicting future performance. 
 
 A buy signal is triggered when all of the following conditions are met:
 - MACD > Signal line: The Moving Average Convergence/Divergence line (difference between the 12-day and 26-day Exponential Moving Averages/EMA) is above its 9-day EMA signal line, indicating positive momentum.
@@ -135,15 +135,13 @@ Indicators computed:
 - Buy signal based on combined indicator logic
 
 ## Quick Analysis Summary
-Included is a Jupyter Notebook visualization of:
+Included is a Python visualization of:
 
 - Buy signal performance across multiple return horizons (1, 5, 10, 20, 30 days)
 
 Metrics:
 
 - Average return
-
-- Median return
 
 - Win rate (percentage of positive returns)
 
@@ -152,16 +150,12 @@ Note: Sample sizes are currently small and results are preliminary. Data volume 
 ## Future Enhancements
 - Expand stock universe beyond initial symbols
 
-- Improve buy signal logic and backtesting
+- Improve buy signal logic and introduce multiple methodologies for comparison
 
-- Add visual dashboards for ongoing performance
+- Add visual dashboards for live tracking of buy signal effectiveness
 
-## How to Contribute
-- Fork the repo and create feature branches
+- Deploy Docker-based pipeline onto Kubernetes
 
-- Test thoroughly before submitting PRs
-
-- Open issues for bugs or enhancement requests
 
 ## License
 MIT License © Charlie Rowe
