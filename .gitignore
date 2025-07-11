@@ -1,3 +1,6 @@
+__pycache__/
+*.pyc
 .env
 /venv
 replace.txt
+remove_password.py
