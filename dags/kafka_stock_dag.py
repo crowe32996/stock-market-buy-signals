@@ -9,6 +9,15 @@ import logging
 import sys
 import os
 import csv
+from dotenv import load_dotenv
+
+load_dotenv()
+
+POSTGRES_DB = os.environ["POSTGRES_DB"]
+POSTGRES_USER = os.environ["POSTGRES_USER"]
+POSTGRES_PASSWORD = os.environ["POSTGRES_PASSWORD"]
+POSTGRES_HOST = os.environ["POSTGRES_HOST"]
+POSTGRES_PORT = os.getenv("POSTGRES_PORT", 5432)
 
 default_args = {
     'owner': 'airflow',
@@ -82,11 +91,11 @@ def run_consumer():
 
 def fetch_stock_data():
     conn = psycopg2.connect(
-        dbname="stock_market_av",
-        user="ec2-user",
-        password="Lefevre102!",
-        host="postgres",
-        port="5432"
+        dbname=POSTGRES_DB,
+        user=POSTGRES_USER,
+        password=POSTGRES_PASSWORD,
+        host=POSTGRES_HOST,
+        port=POSTGRES_PORT
     )
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM stock_data ORDER BY date DESC LIMIT 1000;")
