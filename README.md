@@ -29,9 +29,8 @@ Early results show that buy signals are effective in realizing stronger average 
 2. **Kafka Producer**: Fetches daily stock data for a list of symbols from Alpha Vantage and publishes to a Kafka topic.
 3. **Kafka Consumer**: Reads stock data from Kafka, stores it in PostgreSQL, and computes technical indicators (SMA, RSI, MACD, buy signals).
 4. **PostgreSQL Database**: Stores raw stock data and calculated indicators for analysis and reporting.
-5. **Airflow DAG**: Orchestrates running the producer, consumer, fetching results, and emailing reports.
+5. **Airflow DAG**: Orchestrates running the producer, consumer, fetching results, running buy signnal effectiveness analysis, and emailing reports and visuals.
 6. **Email Notification**: Sends a daily report with stock data and computed signals.
-7. **Jupyter Notebook**: Analyzes historical stock prices after both `buy_signal` True and False to determine the effectiveness of the signals.
 
 ---
 ## Screenshots
