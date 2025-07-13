@@ -4,3 +4,4 @@ __pycache__/
 /venv
 replace.txt
 remove_password.py
+/.git

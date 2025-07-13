@@ -52,12 +52,12 @@ def run_producer():
             stderr=subprocess.PIPE,
             text=True,
             check=True,
-            timeout=300
+            timeout=1500
         )
         logging.info(f"[Producer STDOUT]\n{result.stdout}")
         logging.error(f"[Producer STDERR]\n{result.stderr}")
     except subprocess.TimeoutExpired:
-        logging.error("Producer script timed out after 300 seconds")
+        logging.error("Producer script timed out after 25 minutes")
         raise
     except subprocess.CalledProcessError as e:
         logging.error(f"Producer error (non-zero exit): {e.stderr}")
@@ -75,12 +75,12 @@ def run_consumer():
             stderr=subprocess.PIPE,
             text=True,
             check=True,
-            timeout=300
+            timeout=1500
         )
         logging.info(f"[Consumer STDOUT]\n{result.stdout}")
         logging.error(f"[Consumer STDERR]\n{result.stderr}")
     except subprocess.TimeoutExpired:
-        logging.error("Consumer script timed out after 300 seconds")
+        logging.error("Consumer script timed out after 25 minutes")
         raise
     except subprocess.CalledProcessError as e:
         logging.error(f"Consumer error (non-zero exit): {e.stderr}")

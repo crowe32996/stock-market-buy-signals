@@ -79,6 +79,7 @@ def fetch_stock_data(symbol):
 
 def produce_stock_data(symbol):
     stock_data = fetch_stock_data(symbol)
+    time.sleep(12) # max of 5 API calls per minute
 
     if stock_data:
         #recent_dates = sorted(stock_data.keys(), reverse = True)[:8]
@@ -99,10 +100,12 @@ def produce_stock_data(symbol):
                 print(f"Sent data for {symbol} on {date}")
             except Exception as e:
                 print(f"Error sending data for {symbol} on {date}: {e}")
-            time.sleep(0.5)  # To manage API rate limits
+            time.sleep(0.05)  # To manage API rate limits
 if __name__ == "__main__":
     load_request_count()
-    symbols = ['MSFT','TSLA','NVDA']  # Example stock symbols
+    symbols = ['MSFT','TSLA','NVDA','META','GOOGL','AMZN','AMD','UBER','PLTR','SHOP']  # Example stock symbols
+    #symbols = ['MSFT','TSLA','NVDA']
+    #symbols = ['MSFT','TSLA','NVDA','META','GOOGL']
 
     for symbol in symbols:
         if not can_make_request():
