@@ -103,9 +103,7 @@ def produce_stock_data(symbol):
             time.sleep(0.05)  # To manage API rate limits
 if __name__ == "__main__":
     load_request_count()
-    symbols = ['MSFT','TSLA','NVDA','META','GOOGL','AMZN','AMD','UBER','PLTR','SHOP']  # Example stock symbols
-    #symbols = ['MSFT','TSLA','NVDA']
-    #symbols = ['MSFT','TSLA','NVDA','META','GOOGL']
+    symbols = ['MSFT','TSLA','NVDA','META','GOOGL','AMZN','AMD','UBER','PLTR','SHOP'] 
 
     for symbol in symbols:
         if not can_make_request():
