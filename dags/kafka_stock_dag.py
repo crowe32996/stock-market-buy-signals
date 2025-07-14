@@ -10,6 +10,8 @@ import sys
 import os
 import csv
 from dotenv import load_dotenv
+from airflow.models import Variable
+
 
 load_dotenv()
 
@@ -43,7 +45,13 @@ def print_env_info():
     logging.info(f"Environment PATH: {os.environ.get('PATH')}")
     logging.info(f"User: {os.environ.get('USER')}")
 
+def should_run_producer():
+    return Variable.get("run_producer", default_var="true").lower() == "true"
+
 def run_producer():
+    if not should_run_producer():
+        print("Skipping producer task as per config.")
+        return
     try:
         print_env_info()
         result = subprocess.run(
@@ -98,7 +106,7 @@ def fetch_stock_data():
         port=POSTGRES_PORT
     )
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM stock_data ORDER BY date DESC LIMIT 1000;")
+    cursor.execute("SELECT * FROM stock_data ORDER BY date DESC LIMIT 10000;")
     rows = cursor.fetchall()
     conn.close()
 

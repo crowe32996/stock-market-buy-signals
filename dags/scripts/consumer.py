@@ -131,7 +131,7 @@ if __name__ == "__main__":
     print("Consumer is starting...")
     processed_symbols = set()
     messages_consumed = 0
-    max_messages = 1000
+    max_messages = 10000
 
     try:
         for message in consumer:
