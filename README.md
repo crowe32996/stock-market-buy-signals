@@ -13,14 +13,15 @@ A buy signal is triggered when all of the following conditions are met:
 
 - Closing price > 10-day SMA: The current closing price is above the 10-day SMA, showing strength and confirming the recent positive momentum.
 
-This version tracks three stocks (NVDA, MSFT, TSLA) to stay within free API limits, but future iterations will include a larger population of stock symbols, to get a larger sample size in determining the effectiveness in these indicators in predicting future success.
+This version tracks 25 commonly-traded stocks to stay within free API limits of 25 hits per day, but future iterations will allow for rotating different stock symbols daily to further increase sample size. Future alterations will also involve backtesting logic and indicator thresholds, to determine the most effective logic in assigning buy signals.
 
 
 ---
 
-## Stock Buy Signal Average Returns
-Early results show that buy signals are effective in realizing stronger average returns, particularly over 5+ day horizons.
-![Average Return](screenshots/avg_return_by_buy_signal.png)
+## Stock Buy Signal Win Rate
+Across all timeframes, win rate (% of investments with positive return) is greater for those with buy signals:
+![Win Rate](screenshots/win_rate_by_buy_signal.png)
+
 ---
 
 ## Architecture
@@ -60,8 +61,8 @@ This shows a successful run of the end-to-end pipeline:
 ---
 
 ### Buy Signal Analysis
-Analyzing buy signal performance by average return (shown at the top) and win rate, across multiple return timelines:
-![Win Rate](screenshots/win_rate_by_buy_signal.png)
+Early results show that returns are greater for stocks with buy signals for the 1-day, 10-day, and 20-day timeframes, and are less for the 5-day and 30-day horizons. Future iterations will increase stock symbol input for results with a larger sample size.
+![Average Return](screenshots/avg_return_by_buy_signal.png)
 
 ---
 
