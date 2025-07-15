@@ -138,10 +138,6 @@ if __name__ == "__main__":
             record = message.value
             print(f"Consuming: {record}")
 
-            if record.get('end_of_data'):
-                print("End-of-data signal received. Exiting loop.")
-                break
-
             success = store_stock_data(record)
             if success:
                 processed_symbols.add(record['symbol'])

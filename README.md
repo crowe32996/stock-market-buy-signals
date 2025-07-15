@@ -13,8 +13,14 @@ A buy signal is triggered when all of the following conditions are met:
 
 - Closing price > 10-day SMA: The current closing price is above the 10-day SMA, showing strength and confirming the recent positive momentum.
 
-This version tracks 25 commonly-traded stocks to stay within free API limits of 25 hits per day, but future iterations will allow for rotating different stock symbols daily to further increase sample size. Future alterations will also involve backtesting logic and indicator thresholds, to determine the most effective logic in assigning buy signals.
+This version tracks 25 commonly-traded stocks to stay within free API limits of 25 hits per day, but future iterations will allow for rotating different stock symbols daily to further increase sample size. Future versions will also involve backtesting logic and indicator thresholds, to determine the most effective logic in assigning buy signals.
 
+
+---
+
+## Stock Buy Signal Average Return
+Across all timeframes, the average return % is greater for those with buy signals:
+![Win Rate](screenshots/avg_return_by_buy_signal.png)
 
 ---
 
@@ -27,7 +33,7 @@ Across all timeframes, win rate (% of investments with positive return) is great
 ## Architecture
 
 1. **Dockerized Environment**: The entire stack (Airflow, Kafka, PostgreSQL, and pipeline scripts) runs inside Docker containers using Docker Compose for easy, consistent setup.
-2. **Kafka Producer**: Fetches daily stock data for a list of symbols from Alpha Vantage and publishes to a Kafka topic.
+2. **Kafka Producer**: Fetches daily stock data for a list of symbols from Alpha Vantage and publishes to a Kafka topic. Note the run_producer Airflow variable that can be used to skip producer step to avoid hitting API limits. Alpha Vantage allows 25 requests per day, so with 25 stocks in pipeline, producer can only be run 1x per day.
 3. **Kafka Consumer**: Reads stock data from Kafka, stores it in PostgreSQL, and computes technical indicators (SMA, RSI, MACD, buy signals).
 4. **PostgreSQL Database**: Stores raw stock data and calculated indicators for analysis and reporting.
 5. **Airflow DAG**: Orchestrates running the producer, consumer, fetching results, running buy signnal effectiveness analysis, and emailing reports and visuals.
@@ -57,12 +63,6 @@ Organizing streamed stock data for each stock each day, storing indicators and p
 ### Airflow DAG Graph View
 This shows a successful run of the end-to-end pipeline:
 ![Airflow DAG Graph View](screenshots/airflow_graph.png)
-
----
-
-### Buy Signal Analysis
-Early results show that returns are greater for stocks with buy signals for the 1-day, 10-day, and 20-day timeframes, and are less for the 5-day and 30-day horizons. Future iterations will increase stock symbol input for results with a larger sample size.
-![Average Return](screenshots/avg_return_by_buy_signal.png)
 
 ---
 
@@ -107,7 +107,27 @@ docker-compose run airflow-webserver db init
 docker-compose run airflow-webserver users create --username admin --password admin --firstname Charlie --lastname Rowe --role Admin --email cwr321@gmail.com
 ```
 
-### 5. Access the Airflow UI
+### 5. Configure Airflow Variables (Optional)
+
+The DAG uses an Airflow Variable `run_producer` to control whether the Kafka producer runs on each DAG execution.
+
+- **Variable name:** `run_producer`
+- **Type:** String (`true` or `false`)
+- **Default behavior:** Automatically set to `"true"`, where the DAG updates the messages produced by the Alpha Vantage API.
+- The API request limit is 25 requests per day, so set it to `"false"` if testing/re-running other tasks for the second time in a day and beyond. 
+
+- In the Airflow UI, go to **Admin > Variables**, and create a new variable:
+  - Key: `run_producer`
+  - Value: `true`
+
+- Or via Docker CLI (replace container name if different):
+
+```bash
+docker exec -it stock-market-buy-signals-airflow-webserver-1 airflow variables set run_producer true
+```
+
+
+### 6. Access the Airflow UI
 Open your browser and go to http://localhost:8080, then log in with your new user credentials.
 
 Trigger the DAG kafka_stock_pipeline. Each run will:
@@ -121,9 +141,8 @@ Trigger the DAG kafka_stock_pipeline. Each run will:
 
 - Email the stock summary (Update recipient email in dags/kafka_stock_dag.py)
 
-## Data and Indicators
-Stocks: Example symbols include MSFT, TSLA, NVDA
 
+## Data and Indicators
 Indicators computed:
 
 - SMA 10-day and 50-day
@@ -148,14 +167,13 @@ Metrics:
 Note: Sample sizes are currently small and results are preliminary. Data volume will grow over time as the pipeline runs daily.
 
 ## Future Enhancements
-- Expand stock universe beyond initial symbols
+- Expand stock universe beyond initial 25 symbols and rotate stocks per day
 
 - Improve buy signal logic and introduce multiple methodologies for comparison
 
 - Add visual dashboards for live tracking of buy signal effectiveness
 
 - Deploy Docker-based pipeline onto Kubernetes
-
 
 ## License
 MIT License © Charlie Rowe
