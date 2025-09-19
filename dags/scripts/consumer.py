@@ -20,7 +20,7 @@ for attempt in range(10):
             'stock_data',
             group_id='stock_consumer_group',
             bootstrap_servers=['kafka:9092'],
-            auto_offset_reset='earliest',
+            auto_offset_reset='latest',
             enable_auto_commit=False,
             consumer_timeout_ms=10000,  # Exit if no new messages in 10 sec
             value_deserializer=lambda x: json.loads(x.decode('utf-8'))
