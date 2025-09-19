@@ -5,7 +5,9 @@ import os
 
 
 # --- Paths ---
-csv_path = "../output/stock_buy_signals.csv"  # adjust relative to this file
+#csv_path = "../output/stock_buy_signals.csv"  # if running locally
+csv_path = "output/stock_buy_signals.csv"
+
 
 # --- Load Data ---
 if not os.path.exists(csv_path):
