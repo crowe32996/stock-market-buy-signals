@@ -5,8 +5,58 @@ import os
 
 
 # --- Paths ---
-#csv_path = "../output/stock_buy_signals.csv"  # if running locally
-csv_path = "output/stock_buy_signals.csv"
+csv_path = "../output/stock_buy_signals.csv"  # if running locally
+#csv_path = "output/stock_buy_signals.csv"
+# Map symbols to company domains for logos
+symbol_to_domain = {
+    'MSFT': 'microsoft.com', 'TSLA': 'tesla.com', 'NVDA': 'nvidia.com',
+    'META': 'meta.com', 'GOOGL': 'abc.xyz', 'AMZN': 'amazon.com',
+    'AMD': 'amd.com', 'UBER': 'uber.com', 'PLTR': 'palantir.com',
+    'SHOP': 'shopify.com', 'CRM': 'salesforce.com', 'AAPL': 'apple.com',
+    'NFLX': 'netflix.com', 'ABNB': 'airbnb.com', 'COIN': 'coinbase.com',
+    'LYFT': 'lyft.com', 'DIS': 'disney.com', 'BAC': 'bankofamerica.com',
+    'INTC': 'intel.com', 'KO': 'coca-cola.com', 'PEP': 'pepsico.com',
+    'CSCO': 'cisco.com', 'XOM': 'exxonmobil.com', 'WMT': 'walmart.com',
+    'PG': 'pg.com', 'PFE': 'pfizer.com'
+}
+
+def add_logo_html(df, symbol_col="Symbol"):
+    """Add HTML for company logos."""
+    def logo_html(symbol):
+        domain = symbol_to_domain.get(symbol, "")
+        if domain:
+            url = f"https://logo.clearbit.com/{domain}"
+            return f'<img src="{url}" width="24" style="vertical-align:middle;margin-right:4px">{symbol}'
+        else:
+            return symbol
+    df[symbol_col] = df[symbol_col].apply(logo_html)
+    return df
+
+def render_logo_table(df, symbol_col="Symbol", numeric_cols=None, max_height=400):
+    """Render HTML table with company logos."""
+    if numeric_cols is None:
+        numeric_cols = [c for c in df.columns if c != symbol_col]
+
+    html = f'<div style="max-height:{max_height}px;overflow-y:auto;">'
+    html += '<table style="width:100%; border-collapse: collapse;">'
+    html += f"<tr><th style='text-align:left'>{symbol_col}</th>"
+    for col in numeric_cols:
+        html += f"<th style='text-align:right'>{col}</th>"
+    html += "</tr>"
+
+    for _, row in df.iterrows():
+        html += "<tr>"
+        html += f"<td>{row[symbol_col]}</td>"
+        for col in numeric_cols:
+            val = row[col]
+            if isinstance(val, float):
+                html += f"<td style='text-align:right'>{val:,.2f}</td>"
+            else:
+                html += f"<td style='text-align:right'>{val}</td>"
+        html += "</tr>"
+    html += "</table></div>"
+
+    st.markdown(html, unsafe_allow_html=True)
 
 
 # --- Load Data ---
@@ -19,7 +69,6 @@ df.columns = df.columns.str.strip()
 df['date'] = pd.to_datetime(df['date'])
 df = df.sort_values(['symbol', 'date'])
 
-# --- Page config must come first ---
 st.set_page_config(page_title="Stock Buy Signal Analysis", layout="wide")
 
 # --- Sidebar filters --- #
@@ -70,7 +119,6 @@ summary['days'] = summary['return_period'].str.extract(r'(\d+)').astype(int)
 summary = summary.sort_values(by=['days', 'buy_signal']).reset_index(drop=True)
 summary['buy_signal_str'] = summary['buy_signal'].map({True: 'Buy Signal = TRUE', False: 'Buy Signal = FALSE'})
 
-# --- Map return_period to nicer names --- #
 return_name_map = {
     'return_1d': 'Return L1',
     'return_5d': 'Return L5',
@@ -84,26 +132,32 @@ summary['return_period_display'] = summary['return_period'].map(return_name_map)
 # Update category order for plots
 x_order_display = list(return_name_map.values())
 
-
 # --- Streamlit App ---
 st.title("📈 Stock Buy Signal Analysis")
 st.markdown("Visualizing average returns, win rates, and raw data by buy signals.")
 
-# --- Create tabs ---
 tab_recommend, tab_avg, tab_win, tab_data = st.tabs(["Stock Recommendations", "Average Return", "Win Rate", "Raw Data"])
 
 # --- Stock Recommendations Tab --- #
 with tab_recommend:
-    # Take the most recent date per symbol
-    latest_df = df.groupby('symbol', as_index=False).apply(lambda x: x.loc[x['date'].idxmax()]).reset_index(drop=True)
-    
+    st.subheader("✅ Most Recent Buy Signal for Each Stock:")
+
+    buy_df = df[df['buy_signal'] == True].copy()
+
+    # Keep only the most recent buy signal per stock
+    buy_df = buy_df.sort_values(by=['symbol', 'date'], ascending=[True, False])
+    buy_df = buy_df.groupby('symbol').head(1).reset_index(drop=True)
+    buy_df = buy_df.sort_values(by='date', ascending=False).reset_index(drop=True)
+    buy_df['Date'] = buy_df['date'].dt.strftime("%m/%d/%Y")
+
     # Select simplified columns and rename
-    rec_cols = ['buy_signal', 'symbol', 'date', 'open_price', 'close_price', 'SMA_10', 'SMA_50', 'RSI', 'MACD', 'Signal', 'return_1d', 'return_10d', 'return_30d']
-    latest_df = latest_df[rec_cols]
-    latest_df = latest_df.rename(columns={
+    rec_cols = ['buy_signal', 'symbol', 'Date', 'open_price', 'close_price',
+                'SMA_10', 'SMA_50', 'RSI', 'MACD', 'Signal',
+                'return_1d', 'return_10d', 'return_30d']
+    buy_df = buy_df[rec_cols]
+    buy_df = buy_df.rename(columns={
         'buy_signal': 'Buy Signal',
         'symbol': 'Symbol',
-        'date': 'Date',
         'open_price': 'Open',
         'close_price': 'Close',
         'SMA_10': 'SMA L10',
@@ -113,23 +167,24 @@ with tab_recommend:
         'Signal': 'Signal'
     })
 
-    # Reorder columns, put Buy Signal first
-    latest_df = latest_df[['Buy Signal', 'Symbol', 'Date', 'Open', 'Close', 'SMA L10', 'SMA L50', 'RSI', 'MACD', 'Signal']]
+    # Reorder columns
+    buy_df = buy_df[['Buy Signal', 'Symbol', 'Date', 'Open', 'Close',
+                     'SMA L10', 'SMA L50', 'RSI', 'MACD', 'Signal']]
 
     # Format currency columns
     currency_cols = ['Open', 'Close', 'SMA L10', 'SMA L50']
     for c in currency_cols:
-        latest_df[c] = latest_df[c].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "NA")
+        buy_df[c] = buy_df[c].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "NA")
 
     # Round RSI, MACD, Signal to 2 decimals
     round_cols = ['RSI', 'MACD', 'Signal']
     for c in round_cols:
-        latest_df[c] = latest_df[c].round(2)
+        buy_df[c] = buy_df[c].round(2)
 
-    latest_df = latest_df.sort_values(by=['Buy Signal', 'Symbol'], ascending=[False, True]).reset_index(drop=True)
-
-    # Display
-    st.dataframe(latest_df, use_container_width=True)
+    # --- Add logos and render HTML table ---
+    buy_df = add_logo_html(buy_df, symbol_col="Symbol")
+    numeric_cols = ['Date', 'Open', 'Close', 'SMA L10', 'SMA L50', 'RSI', 'MACD', 'Signal']
+    render_logo_table(buy_df, symbol_col="Symbol", numeric_cols=numeric_cols)
 
 # --- Avg Return Plot ---
 with tab_avg:
@@ -191,8 +246,6 @@ with tab_win:
 with tab_data:
     # Copy df to avoid modifying original
     df_display = df.copy()
-
-    # Drop 'id'
     df_display = df_display.drop(columns=['id'])
 
     # Rename columns

@@ -2,6 +2,12 @@
 
 ## Overview
 
+Explore stock buy signals interactively in the Streamlit app:
+
+![Stock Buy Signals](screenshots/streamlit_app.png)
+
+[Open Streamlit App](https://stock-market-buy-signals-ftwnfk6lg32nxd7tcfyjpk.streamlit.app)
+
 This project is a data pipeline that generates automated buy signal alerts for selected stocks and evaluates the effectiveness of technical indicators in predicting future performance. 
 
 A buy signal is triggered when all of the following conditions are met:
@@ -20,13 +26,13 @@ This version tracks 25 commonly-traded stocks to stay within free API limits of 
 
 ## Stock Buy Signal Average Return
 Across all timeframes, the average return % is greater for those with buy signals:
-![Win Rate](screenshots/avg_return_by_buy_signal.png)
+![Win Rate](screenshots/avg_return_by_buy_signal_streamlit.png)
 
 ---
 
 ## Stock Buy Signal Win Rate
 Across all timeframes, win rate (% of investments with positive return) is greater for those with buy signals:
-![Win Rate](screenshots/win_rate_by_buy_signal.png)
+![Win Rate](screenshots/win_rate_by_buy_signal_streamlit.png)
 
 ---
 
@@ -38,6 +44,7 @@ Across all timeframes, win rate (% of investments with positive return) is great
 4. **PostgreSQL Database**: Stores raw stock data and calculated indicators for analysis and reporting.
 5. **Airflow DAG**: Orchestrates running the producer, consumer, fetching results, running buy signnal effectiveness analysis, and emailing reports and visuals.
 6. **Email Notification**: Sends a daily report with stock data and computed signals.
+7. **Streamlit App**: Tracks most recent buy signals for each stock, analysis of signal effectiveness, and raw data
 
 ---
 ## Screenshots

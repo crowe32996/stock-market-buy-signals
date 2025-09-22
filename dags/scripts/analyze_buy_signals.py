@@ -45,7 +45,6 @@ summary = pd.concat(return_frames, ignore_index=True)
 summary['days'] = summary['return_period'].str.extract(r'(\d+)').astype(int)
 summary = summary.sort_values(by=['days', 'buy_signal']).reset_index(drop=True)
 
-# Map buy_signal boolean to string for nicer legend
 summary['buy_signal_str'] = summary['buy_signal'].map({True: 'Buy Signal = TRUE', False: 'Buy Signal = FALSE'})
 
 x_order = [f'return_{d}d' for d in horizons]
@@ -63,7 +62,7 @@ fig_avg = px.bar(
         'buy_signal_str': 'Buy Signal'
     },
     title='Average Return by Buy Signal and Return Period',
-    text='count'  # show counts on bars
+    text='count' 
 )
 
 fig_avg.update_traces(texttemplate='n=%{text}', textposition='outside')

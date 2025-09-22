@@ -106,7 +106,6 @@ def compute_and_update_indicators(symbol):
     df['MACD'] = df['EMA_12'] - df['EMA_26']
     df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
 
-    # Add buy_signal logic
     df['buy_signal'] = (
         (df['MACD'] > df['Signal']) &
         (df['RSI'] < 65) &
