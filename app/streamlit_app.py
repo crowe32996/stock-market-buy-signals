@@ -5,8 +5,8 @@ import os
 
 
 # --- Paths ---
-csv_path = "../output/stock_buy_signals.csv"  # if running locally
-#csv_path = "output/stock_buy_signals.csv"
+#csv_path = "../output/stock_buy_signals.csv"  # if running locally
+csv_path = "output/stock_buy_signals.csv"
 # Map symbols to company domains for logos
 symbol_to_domain = {
     'MSFT': 'microsoft.com', 'TSLA': 'tesla.com', 'NVDA': 'nvidia.com',
