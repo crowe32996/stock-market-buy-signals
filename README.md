@@ -1,4 +1,4 @@
-# Stock Technical Indicator Analysis
+# Stock Buy Signal Analysis
 
 ## Overview
 
