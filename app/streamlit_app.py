@@ -6,7 +6,7 @@ import numpy as np
 
 # --- Paths ---
 #csv_path = "../output/debug_csvs/stock_buy_signals_ML.csv"  # if running locally
-csv_path = "output/stock_buy_signals.csv"
+csv_path = "output/stock_buy_signals_ML.csv"
 # Map symbols to company domains for logos
 BUCKET_THRESHOLDS = {
     'short': {'sell': 0.3, 'hold': 0.65, 'buy': 1.0},
