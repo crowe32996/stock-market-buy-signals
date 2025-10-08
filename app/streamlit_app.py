@@ -1,268 +1,127 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-import os
 import numpy as np
+import os
+from sqlalchemy import create_engine
+from utils import (
+    bucket_probabilities_quantile,
+    add_logo_html,
+    render_logo_table,
+    plot_bucket_curves_plotly,
+    compute_spy_forward_returns,
+    compute_forward_returns,
+    summarize_buckets,
+    HORIZONS,
+    COLOR_MAP
+)
 
-# --- Paths ---
-#csv_path = "../output/debug_csvs/stock_buy_signals_ML.csv"  # if running locally
-csv_path = "output/stock_buy_signals_ML.csv"
-# Map symbols to company domains for logos
-BUCKET_THRESHOLDS = {
-    'short': {'sell': 0.3, 'hold': 0.65, 'buy': 1.0},
-    'medium': {'sell': 0.3, 'hold': 0.65, 'buy': 1.0},
-    'long': {'sell': 0.3, 'hold': 0.65, 'buy': 1.0}
-}
-symbol_to_domain = {
-    # Large-cap tech / growth
-    'AAPL': 'apple.com',
-    'MSFT': 'microsoft.com',
-    'GOOGL': 'abc.xyz',
-    'AMZN': 'amazon.com',
-    'NVDA': 'nvidia.com',
-    'META': 'meta.com',
-    'TSLA': 'tesla.com',
-    'ADBE': 'adobe.com',
-    'CRM': 'salesforce.com',
-    'NFLX': 'netflix.com',
-    'PYPL': 'paypal.com',
-    'SHOP': 'shopify.com',
-    'SQ': 'block.com',  # Square -> block.com
+# Paths relative to project root
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # app/ -> project_root
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 
-    # Broad ETFs / indexes (usually no logo for SPY, etc.)
-    'SPY': '',
-    'QQQ': '',
-    'DIA': '',
-    'IWM': '',
-    'VTI': '',
-    'VOO': '',
+SIGNALS_CSV = os.path.join(OUTPUT_DIR, "stock_buy_signals_ML.csv")
+SPY_CSV = os.path.join(OUTPUT_DIR, "SPY_data.csv")
 
-    # Consumer staples
-    'KO': 'coca-cola.com',
-    'PEP': 'pepsico.com',
-    'PG': 'pg.com',
-    'CL': 'clorox.com',
-    'MDLZ': 'mondelezinternational.com',
-    'COST': 'costco.com',
-    'WMT': 'walmart.com',
-    'MCD': 'mcdonalds.com',
-    'SBUX': 'starbucks.com',
-    'YUM': 'yum.com',
+USE_CSV = os.getenv("USE_CSV", "1") == "1"  # set to "0" to use Postgres
 
-    # Financials
-    'JPM': 'jpmorganchase.com',
-    'BAC': 'bankofamerica.com',
-    'C': 'citigroup.com',
-    'WFC': 'wellsfargo.com',
-    'GS': 'goldmansachs.com',
-    'MS': 'morganstanley.com',
-    'SCHW': 'schwab.com',
-    'AXP': 'americanexpress.com',
-    'V': 'visa.com',
-    'MA': 'mastercard.com',
-
-    # Healthcare & biotech
-    'JNJ': 'jnj.com',
-    'PFE': 'pfizer.com',
-    'MRK': 'merck.com',
-    'ABBV': 'abbvie.com',
-    'LLY': 'lilly.com',
-    'BMY': 'bms.com',
-    'GILD': 'gilead.com',
-    'AMGN': 'amgen.com',
-    'REGN': 'regeneron.com',
-    'VRTX': 'vrtx.com',
-    'CVS': 'cvs.com',
-    'UNH': 'uhc.com',
-
-    # Industrials & transportation
-    'GE': 'ge.com',
-    'BA': 'boeing.com',
-    'CAT': 'caterpillar.com',
-    'DE': 'deere.com',
-    'UPS': 'ups.com',
-    'FDX': 'fedex.com',
-    'LMT': 'lockheedmartin.com',
-    'NOC': 'northropgrumman.com',
-    'HON': 'honeywell.com',
-    'RTX': 'raytheon.com',
-    'TM': 'toyota-global.com',
-    'GM': 'gm.com',
-    'F': 'ford.com',
-
-    # Energy & materials
-    'XOM': 'exxonmobil.com',
-    'CVX': 'chevron.com',
-    'COP': 'conocophillips.com',
-    'SLB': 'schlumberger.com',
-    'HAL': 'haliburton.com',
-    'PSX': 'phillips66.com',
-    'MPC': 'marathonpetroleum.com',
-    'EOG': 'eogresources.com',
-    'PXD': 'pioneerdrilling.com',  # approximation
-    'VLO': 'valero.com',
-    'BHP': 'bhp.com',
-    'RIO': 'riotinto.com',
-
-    # Communication / Media
-    'T': 'att.com',
-    'VZ': 'verizon.com',
-    'CMCSA': 'comcast.com',
-    'DIS': 'disney.com',
-    'PINS': 'pinterest.com',
-    'SNAP': 'snap.com',
-    'TWTR': 'twitter.com',
-    'BABA': 'alibaba.com',
-    'JD': 'jd.com',
-    'TCEHY': 'tencent.com',
-    'SONY': 'sony.com',
-
-    # REITs / real estate
-    'AMT': 'americantower.com',
-    'PLD': 'prologis.com',
-    'SPG': 'simpsonsproperty.com',  # approximate / could adjust
-    'O': 'realtyincome.com',
-    'VNQ': 'vanguard.com',
-    'DLR': 'digitalrealty.com',
-    'EQIX': 'equinix.com',
-
-    # Emerging / midcaps / underperformers
-    'UBER': 'uber.com',
-    'LYFT': 'lyft.com',
-    'ABNB': 'airbnb.com',
-    'COIN': 'coinbase.com',
-    'RBLX': 'roblox.com',
-    'ZM': 'zoom.us',
-    'NET': 'cloudflare.com',
-    'DOCU': 'docusign.com',
-    'ROKU': 'roku.com',
-    'PTON': 'onepeloton.com',
-    'FSLY': 'fastly.com'
-}
-PLACEHOLDER_LOGOS = {
-    'ADBE': 'https://via.placeholder.com/24?text=ADBE',
-    'BAC': 'https://via.placeholder.com/24?text=BAC',
-    # You can add more as needed
-}
-HORIZONS = {
-    'short': {'prob_col': 'buy_prob_ml_short', 'max_days': 10},
-    'medium': {'prob_col': 'buy_prob_ml_medium', 'max_days': 100},
-    'long': {'prob_col': 'buy_prob_ml_long', 'max_days': 150}
-}
-
-def add_probability_buckets(df):
-    """
-    Assign 'sell', 'hold', 'buy' labels based on ML probability columns and BUCKET_THRESHOLDS.
-    """
-    for horizon in HORIZONS:
-        prob_col = f"buy_prob_ml_{horizon}"
-        bucket_col = f"signal_bucket_{horizon}"  # new column with sell/hold/buy
-
-        def bucket_label(p):
-            if pd.isna(p):
-                return np.nan
-            if p < BUCKET_THRESHOLDS[horizon]['sell']:
-                return 'sell'
-            elif p < BUCKET_THRESHOLDS[horizon]['hold']:
-                return 'hold'
-            else:
-                return 'buy'
-
-        df[bucket_col] = df[prob_col].apply(bucket_label)
-
-    return df
-
-def add_logo_html(df, symbol_col="Symbol"):
-    """Add HTML for company logos."""
-    def logo_html(symbol):
-        domain = symbol_to_domain.get(symbol, "")
-        if domain:
-            url = f"https://logo.clearbit.com/{domain}"
-            return f'<img src="{url}" width="24" style="vertical-align:middle;margin-right:4px">{symbol}'
-        else:
-            return symbol
-    df[symbol_col] = df[symbol_col].apply(logo_html)
-    return df
-
-def render_logo_table(df, symbol_col="Symbol", numeric_cols=None, max_height=400):
-    """Render HTML table with company logos."""
-    if numeric_cols is None:
-        numeric_cols = [c for c in df.columns if c != symbol_col]
-
-    html = f'<div style="max-height:{max_height}px;overflow-y:auto;">'
-    html += '<table style="width:100%; border-collapse: collapse;">'
-    html += f"<tr><th style='text-align:left'>{symbol_col}</th>"
-    for col in numeric_cols:
-        html += f"<th style='text-align:right'>{col}</th>"
-    html += "</tr>"
-
-    for _, row in df.iterrows():
-        html += "<tr>"
-        html += f"<td>{row[symbol_col]}</td>"
-        for col in numeric_cols:
-            val = row[col]
-            if isinstance(val, float):
-                html += f"<td style='text-align:right'>{val:,.2f}</td>"
-            else:
-                html += f"<td style='text-align:right'>{val}</td>"
-        html += "</tr>"
-    html += "</table></div>"
-
-    st.markdown(html, unsafe_allow_html=True)
-
-def bucket_probabilities_quantile(df, prob_col, bucket_col, buy_pct=0.2, sell_pct=0.2):
-    """
-    Assign buckets so that the top buy_pct fraction is 'buy',
-    the bottom sell_pct fraction is 'sell', and the rest is 'hold'.
-    """
-    df[bucket_col] = 'hold'
-    sell_thresh = df[prob_col].quantile(sell_pct)
-    buy_thresh = df[prob_col].quantile(1 - buy_pct)
+@st.cache_data(ttl=3600)
+def load_data():
+    if USE_CSV and os.path.exists(SIGNALS_CSV) and os.path.exists(SPY_CSV):
+        # Load from CSV
+        df_all = pd.read_csv(SIGNALS_CSV)
+        df_all['date'] = pd.to_datetime(df_all['date'])
+        
+        spy_df = pd.read_csv(SPY_CSV)
+        spy_df['date'] = pd.to_datetime(spy_df['date'])
+    else:
+        # Load from Postgres, for once deployed to EC2
+        from sqlalchemy import create_engine
+        engine = create_engine(
+            f"postgresql+psycopg2://{os.environ['POSTGRES_USER']}:{os.environ['POSTGRES_PASSWORD']}@"
+            f"{os.environ['POSTGRES_HOST']}:{os.environ.get('POSTGRES_PORT', 5432)}/{os.environ['POSTGRES_DB']}"
+        )
+        df_all = pd.read_sql("SELECT * FROM stock_data WHERE symbol!='SPY' ORDER BY date ASC", engine)
+        df_all.columns = df_all.columns.str.strip()
+        df_all['date'] = pd.to_datetime(df_all['date'])
+        
+        spy_df = pd.read_sql("SELECT date, close_price FROM stock_data WHERE symbol='SPY' ORDER BY date ASC", engine)
+        spy_df['date'] = pd.to_datetime(spy_df['date'])
     
-    df.loc[df[prob_col] <= sell_thresh, bucket_col] = 'sell'
-    df.loc[df[prob_col] >= buy_thresh, bucket_col] = 'buy'
-    return df
+    return df_all, spy_df
 
-# --- Load Data --- #
-if not os.path.exists(csv_path):
-    st.error(f"{csv_path} not found. Make sure the DAG has run and generated the CSV.")
-    st.stop()
+@st.cache_data(ttl=3600)
+def get_bucket_summary(df, prob_col, bucket_col, max_days):
+    df = bucket_probabilities_quantile(df.copy(), prob_col, bucket_col)
+    df = compute_forward_returns(df, max_days)
+    summary = summarize_buckets(df, bucket_col, max_days)
+    return summary
 
-df = pd.read_csv(csv_path)
-df.columns = df.columns.str.strip()
-df['date'] = pd.to_datetime(df['date'])
-df = df.sort_values(['symbol', 'date'])
+def get_summary_for_tab(df, horizon_key, signal_col, bucket_col, max_days, selected_symbol, precomputed_summaries):
+    if selected_symbol == "All":
+        return precomputed_summaries[horizon_key]
+    else:
+        df_filtered = df.copy()
+        if 'date' in df.columns and horizon_key == '2023':
+            df_filtered = df_filtered[df_filtered['date'].dt.year == 2023]
+        df_filtered = df_filtered[df_filtered['symbol'] == selected_symbol]
+        return get_bucket_summary(df_filtered, signal_col, bucket_col, max_days)
 
-# --- Add quantile-based bucket columns for each horizon --- #
+df_all, spy_df = load_data()
+
 for horizon_name in ['short', 'medium', 'long']:
     prob_col = f"buy_prob_ml_{horizon_name}"
-    bucket_col = f"signal_bucket_{horizon_name}"
-    df = bucket_probabilities_quantile(df, prob_col, bucket_col, buy_pct=0.2, sell_pct=0.2)
+    bucket_col = f'signal_bucket_{horizon_name}'
+    df_all = bucket_probabilities_quantile(df_all, prob_col, bucket_col)  # assign directly
 
+# Precompute SPY forward returns
+spy_summary = compute_spy_forward_returns(spy_df, max_days=150)
+spy_summary_2023 = compute_spy_forward_returns(spy_df[spy_df['date'].dt.year == 2023], max_days=150)
+
+# -----------------------------
+# Compute buckets and summaries
+# -----------------------------
+bucket_summaries = {}
+bucket_summaries_2023 = {}
+
+for horizon_name, params in HORIZONS.items():
+    prob_col = params['prob_col']
+    max_days = params['max_days']
+    bucket_col = f'signal_bucket_{horizon_name}'
+
+    # 2024-current
+    bucket_summaries[horizon_name] = get_bucket_summary(df_all, prob_col, bucket_col, max_days)
+
+    # 2023 backtest
+    df_2023 = df_all[df_all['date'].dt.year == 2023].copy()
+    bucket_summaries_2023[horizon_name] = get_bucket_summary(df_2023, prob_col, bucket_col, max_days)
+
+# -----------------------------
+# Streamlit setup
+# -----------------------------
 st.set_page_config(page_title="Stock Buy Signal Analysis", layout="wide")
-# --- Sidebar filters --- #
-# Symbol filter: single select or all
-symbol_options = sorted(df['symbol'].unique())
-symbol_options.insert(0, "All")  # option to select all symbols
+
+# Sidebar filters
+symbol_options = sorted(df_all['symbol'].unique())
+symbol_options.insert(0, "All")
 selected_symbol = st.sidebar.selectbox("Select Symbol", symbol_options, index=0)
 
-# Sidebar: Horizon selection
 horizon = st.sidebar.radio("Select Horizon", ["Short", "Medium", "Long"])
 horizon_map = {
-    "Short": {"prob_col": "buy_prob_ml_short", "signal_col": "buy_ml_short", "max_days": 10},
-    "Medium": {"prob_col": "buy_prob_ml_medium", "signal_col": "buy_ml_medium", "max_days": 100},
-    "Long": {"prob_col": "buy_prob_ml_long", "signal_col": "buy_ml_long", "max_days": 150}
+    "Short": {"prob_col": "buy_prob_ml_short", "max_days": 10},
+    "Medium": {"prob_col": "buy_prob_ml_medium", "max_days": 100},
+    "Long": {"prob_col": "buy_prob_ml_long", "max_days": 150}
 }
 selected_horizon = horizon_map[horizon]
-signal_col = selected_horizon['signal_col']
-prob_col = selected_horizon['prob_col']
+signal_col = selected_horizon['prob_col']
+horizon_key = horizon.lower()
+bucket_col = f'signal_bucket_{horizon_key}'
+max_days = selected_horizon['max_days']
 
+# Filter dataframe for selected symbol
 if selected_symbol != "All":
-    df_filtered = df[df['symbol'] == selected_symbol].copy()
+    df_filtered = df_all[df_all['symbol'] == selected_symbol].copy()
 else:
-    df_filtered = df.copy()
-
-# --- Date filter: single date picker --- #
+    df_filtered = df_all.copy()
 latest_date = df_filtered['date'].max()
 selected_date = st.sidebar.date_input(
     "Select Date",
@@ -270,98 +129,119 @@ selected_date = st.sidebar.date_input(
     min_value=df_filtered['date'].min(),
     max_value=latest_date
 )
-
-# Filter dataframe by the selected date
 df_filtered = df_filtered[df_filtered['date'] == pd.to_datetime(selected_date)]
 df_filtered['Date'] = df_filtered['date'].dt.strftime("%m/%d/%Y")
 
-if selected_symbol != "All":
-    df = df[df['symbol'] == selected_symbol]
-else:
-    df = df.copy()
-
-# --- Streamlit App ---
+# -----------------------------
+# Streamlit Tabs
+# -----------------------------
 st.title("📈 Stock Buy Signal Analysis")
-st.markdown("Evaluating the performance of buy signals determined by Random Forest models trained by technical indicators across short, medium, and long horizons.")
+st.markdown(
+    "Evaluating the performance of buy signals determined by Random Forest models "
+    "across short, medium, and long horizons."
+)
 
 tab_recommend, tab_overall, tab_2023, tab_methodology = st.tabs(
     ["Stock Recommendations", "Signal Performance (2024-current)", "2023 Backtest", "Methodology"]
 )
 
-# --- Stock Recommendations Tab --- #
+# --- Tab 1: Daily Stock Signals ---
 with tab_recommend:
-    st.subheader(f"📅 Daily Stock Signals ({horizon.capitalize()} Term)")
+    st.subheader(f"📅 Daily Stock Signals ({horizon} Term)")
 
-    # Horizon-specific bucket column
-    bucket_col = f"signal_bucket_{horizon.lower()}"
+    df_sorted = df_all.sort_values(['symbol','date'])
+    latest_close_per_symbol = df_sorted.groupby('symbol')['close_price'].last().to_dict()
+    df_filtered['Most_Recent_Close'] = df_filtered['symbol'].map(latest_close_per_symbol)
 
-    # Define function to render each bucket table
-    def render_bucket_table(df, bucket_label, bucket_col):
+    def render_bucket_table(df, bucket_label):
         bucket_df = df[df[bucket_col] == bucket_label].copy()
         if bucket_df.empty:
             st.write(f"No {bucket_label.capitalize()} signals for this day.")
             return
 
-        rec_cols = [bucket_col, 'symbol', 'Date', 'open_price', 'close_price']
-        bucket_df = bucket_df[rec_cols]
+        bucket_df = bucket_df[['Date','symbol','close_price','Most_Recent_Close']].copy()
         bucket_df = bucket_df.rename(columns={
-            bucket_col: 'Signal',
-            'symbol': 'Symbol',
-            'open_price': 'Open',
-            'close_price': 'Close',
+            'symbol':'Symbol',
+            'close_price':'Selected Day Close',
+            'Most_Recent_Close':'Most Recent Close'
         })
-
-        # Format currency columns
-        currency_cols = ['Open', 'Close']
-        for c in currency_cols:
-            bucket_df[c] = bucket_df[c].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "NA")
-
-        # Add logos and render table
+        bucket_df['Selected Day Close'] = bucket_df['Selected Day Close'].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "NA")
+        bucket_df['Most Recent Close'] = bucket_df['Most Recent Close'].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "NA")
         bucket_df = add_logo_html(bucket_df, symbol_col="Symbol")
-        numeric_cols = ['Date', 'Open', 'Close']
-        render_logo_table(bucket_df, symbol_col="Symbol", numeric_cols=numeric_cols)
+        render_logo_table(bucket_df, symbol_col="Symbol", numeric_cols=['Selected Day Close','Most Recent Close'])
 
-    # Render Buy, Hold, Sell tables
     st.markdown("### ✅ Buy Signals")
-    render_bucket_table(df_filtered, 'buy', bucket_col)
-
+    render_bucket_table(df_filtered, 'buy')
     st.markdown("### ⚪ Hold Signals")
-    render_bucket_table(df_filtered, 'hold', bucket_col)
-
+    render_bucket_table(df_filtered, 'hold')
     st.markdown("### ❌ Sell Signals")
-    render_bucket_table(df_filtered, 'sell', bucket_col)
+    render_bucket_table(df_filtered, 'sell')
 
+# --- Tab 2: Signal Performance (2024-current) ---
 with tab_overall:
-    st.subheader(f"Signal Performance 2024-current ({horizon.capitalize()} Horizon)")
-    
-    #avg_return_file = f"../output/avg_return_buckets_{horizon.lower()}.png" if running locally
-    #winrate_file = f"../output/winrate_buckets_{horizon.lower()}.png"
+    st.subheader(f"Signal Performance 2024-current ({horizon} Horizon)")
+    # Filter for selected symbol (or keep all)
+    # Use precomputed summaries
+    summary_df_filtered = get_summary_for_tab(
+        df_all,
+        horizon_key,
+        signal_col,
+        bucket_col,
+        max_days,
+        selected_symbol,
+        bucket_summaries
+    )
 
-    avg_return_file = f"output/avg_return_buckets_{horizon.lower()}.png"
-    winrate_file = f"output/winrate_buckets_{horizon.lower()}.png"
-    
-    st.markdown("### Average Return by Signal")
-    st.image(avg_return_file, use_container_width=True)
+    fig_avg_return = plot_bucket_curves_plotly(
+        summary_df_filtered,
+        bucket_col=bucket_col,
+        title="Average Return by Signal",
+        y_col='avg_return',
+        spy_summary=spy_summary,
+        color_map= COLOR_MAP
+    )
+    fig_winrate = plot_bucket_curves_plotly(
+        summary_df_filtered,
+        bucket_col=bucket_col,
+        title="Win Rate by Signal",
+        y_col='win_rate',
+        spy_summary=spy_summary,
+        color_map= COLOR_MAP
+    )
+    st.plotly_chart(fig_avg_return, use_container_width=True)
+    st.plotly_chart(fig_winrate, use_container_width=True)
 
-    st.markdown("### Win Rate by Signal")
-    st.image(winrate_file, use_container_width=True)
-
-# -------------------------
-# Tab 3: 2023 Backtest
-# -------------------------
+# --- Tab 3: 2023 Backtest ---
 with tab_2023:
-    st.subheader(f"2023 Backtest ({horizon.capitalize()} Horizon)")
-    
-    #avg_return_2023_file = f"../output/avg_return_buckets_{horizon.lower()}_2023.png" if running locally
-    #winrate_2023_file = f"../output/winrate_buckets_{horizon.lower()}_2023.png"
-    avg_return_2023_file = f"output/avg_return_buckets_{horizon.lower()}_2023.png"
-    winrate_2023_file = f"output/winrate_buckets_{horizon.lower()}_2023.png"
-    
-    st.markdown("### Average Return by Signal (2023)")
-    st.image(avg_return_2023_file, use_container_width=True)
+    st.subheader(f"2023 Backtest ({horizon} Horizon)")
+    summary_df_2023_filtered = get_summary_for_tab(
+        df_all,
+        horizon_key,
+        signal_col,
+        bucket_col,
+        max_days,
+        selected_symbol,
+        bucket_summaries_2023
+    )
 
-    st.markdown("### Win Rate by Signal (2023)")
-    st.image(winrate_2023_file, use_container_width=True)
+    fig_avg_return_2023 = plot_bucket_curves_plotly(
+        summary_df_2023_filtered,
+        bucket_col=bucket_col,
+        title="Average Return by Signal (2023)",
+        y_col='avg_return',
+        spy_summary=spy_summary_2023,
+        color_map= COLOR_MAP
+    )
+    fig_winrate_2023 = plot_bucket_curves_plotly(
+        summary_df_2023_filtered,
+        bucket_col=bucket_col,
+        title="Win Rate by Signal (2023)",
+        y_col='win_rate',
+        spy_summary=spy_summary_2023,
+        color_map= COLOR_MAP
+    )
+    st.plotly_chart(fig_avg_return_2023, use_container_width=True)
+    st.plotly_chart(fig_winrate_2023, use_container_width=True)
 
 with tab_methodology:
     st.title("Methodology")
@@ -399,7 +279,6 @@ with tab_methodology:
     - **Buy**: top 20% probability
     - **Hold**: middle 60%
     - **Sell**: bottom 20%
-    This approach captures both **high-confidence buys** and **uncertain positions**.
     """)
 
     st.subheader("Model Effectiveness")
@@ -408,4 +287,11 @@ with tab_methodology:
     - Note the "Signal Performance" tab to see this plot, but keep in mind that the Random Classifier requires training data which can result in overfitting. 
     - The "2023 Backtest" tab looks at a time range completely outside of the training dataset to further evaluate performance of the signals.
     - Future versions will increase the backtesting window for further evaluation.
+    """)
+
+    st.markdown("---")
+    st.markdown("""
+    ⚠️ **Disclaimer**
+
+    The information presented in this application is for **educational and informational purposes only** and **does not constitute financial, investment, or trading advice**. Past performance does not guarantee future results. Users should perform their own due diligence or consult a licensed financial advisor before making any investment decisions.
     """)

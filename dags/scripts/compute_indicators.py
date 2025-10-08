@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 load_dotenv()
 OUTPUT_DIR = "/opt/airflow/volumes/output"
 OUTPUT_ML_CSV = os.path.join(OUTPUT_DIR, "stock_buy_signals_ML.csv")
+OUTPUT_SPY_CSV = os.path.join(OUTPUT_DIR, "SPY_data.csv")
 
 POSTGRES_DB = os.environ["POSTGRES_DB"]
 POSTGRES_USER = os.environ["POSTGRES_USER"]
@@ -322,7 +323,16 @@ if __name__ == "__main__":
 
     # Export to CSV
     df_all.to_csv(OUTPUT_ML_CSV, index=False)
-    print(f"✅ CSV written from DB: {OUTPUT_ML_CSV}")
+
+    query_spy = """
+        SELECT date, close_price
+        FROM stock_data
+        WHERE symbol = 'SPY'
+        ORDER BY date
+    """
+    spy_df = pd.read_sql(query_spy, conn)
+    spy_df['date'] = pd.to_datetime(spy_df['date'])
+    spy_df.to_csv(OUTPUT_SPY_CSV, index=False)
 
     cursor.close()
     conn.close()

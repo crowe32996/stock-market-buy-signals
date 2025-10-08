@@ -98,6 +98,21 @@ services:
     networks:
       - airflow_network
 
+  streamlit:
+    build:
+      context: ./app      # points to the folder with your Streamlit Dockerfile
+      dockerfile: Dockerfile.streamlit   # if you named it Dockerfile, otherwise specify the name
+    ports:
+      - "8501:8501"
+    env_file: .env
+    volumes:
+      - ./app:/app       # optional if you want live code updates
+    command: streamlit run streamlit_app.py --server.port=8501 --server.address=0.0.0.0
+    depends_on:
+      - postgres
+    networks:
+      - airflow_network
+      
 volumes:
   kafka_data:
   postgres_data:

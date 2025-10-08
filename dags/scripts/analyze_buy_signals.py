@@ -3,54 +3,13 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 import os
 import psycopg2
+import plotly.graph_objects as go
 from dotenv import load_dotenv
 
 # -----------------------------
 # Load ML outputs
 # -----------------------------
 load_dotenv()
-
-# Connect to Postgres
-conn = psycopg2.connect(
-    dbname=os.environ["POSTGRES_DB"],
-    user=os.environ["POSTGRES_USER"],
-    password=os.environ["POSTGRES_PASSWORD"],
-    host=os.environ["POSTGRES_HOST"],
-    port=os.environ["POSTGRES_PORT"]
-)
-
-# Load SPY prices
-spy_df = pd.read_sql("SELECT date, close_price FROM stock_data WHERE symbol='SPY' ORDER BY date ASC", conn)
-spy_df['date'] = pd.to_datetime(spy_df['date'])
-spy_df = spy_df.sort_values('date').reset_index(drop=True)
-conn.close()
-
-OUTPUT_DIR = "/opt/airflow/volumes/output"
-csv_path = os.path.join(OUTPUT_DIR, "stock_buy_signals_ML.csv")
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-if not os.path.exists(csv_path):
-    raise FileNotFoundError(f"{csv_path} not found. Make sure the DAG has run and generated the CSV.")
-
-df = pd.read_csv(csv_path)
-df.columns = df.columns.str.strip()
-df['date'] = pd.to_datetime(df['date'])
-df = df.sort_values(['symbol', 'date'])
-
-# -----------------------------
-# Parameters
-# -----------------------------
-HORIZONS = {
-    'short': {'prob_col': 'buy_prob_ml_short', 'max_days': 10},
-    'medium': {'prob_col': 'buy_prob_ml_medium', 'max_days': 100},
-    'long': {'prob_col': 'buy_prob_ml_long', 'max_days': 150}
-}
-
-BUCKET_LABELS = {
-    'buy': 'Buy',
-    'hold': 'Hold',
-    'sell': 'Sell',
-    'SPY':'SPY'
-}
 
 # -----------------------------
 # Functions
@@ -106,48 +65,96 @@ def summarize_buckets(df, bucket_col, max_days):
         summary_frames.append(summary)
     return pd.concat(summary_frames, ignore_index=True)
 
-def plot_bucket_curves(summary_df, bucket_col, title, y_col, output_file, spy_summary=None, ylabel=None):
-    plt.figure(figsize=(10,6))
-    max_days = summary_df['days'].max()
+def plot_bucket_curves_plotly(summary_df, bucket_col, title, y_col, spy_summary=None):
+    """
+    Creates an interactive Plotly chart for bucketed performance.
     
+    summary_df: dataframe with bucket performance (avg_return or win_rate)
+    bucket_col: column name for bucket labels
+    title: chart title
+    y_col: column to plot ('avg_return' or 'win_rate')
+    spy_summary: optional dataframe for SPY reference line
+    """
+    fig = go.Figure()
+    max_days = summary_df['days'].max()
+
+    # Plot each bucket
     for bucket in summary_df[bucket_col].unique():
         df_plot = summary_df[summary_df[bucket_col] == bucket]
-        plt.plot(df_plot['days'], df_plot[y_col], label=BUCKET_LABELS.get(bucket, bucket))
-        # annotate N on every 10th day to reduce clutter
-        for i, row in df_plot.iterrows():
-            if row['days'] % max(1, max_days//10) == 0:  # adjust step
-                plt.text(row['days'], row[y_col], f"N={int(row['count'])}", fontsize=8, ha='center', va='bottom')
-    
-    if spy_summary is not None:
-        spy_plot = spy_summary[spy_summary['days'] <= summary_df['days'].max()]
-        # Use the same y_col as the main plot (avg_return or win_rate)
-        spy_y = spy_plot[y_col]  
-        plt.plot(spy_plot['days'], spy_y, label='SPY', color='black', linestyle='--', linewidth=2)
-    
-    plt.axhline(0, color='gray', linestyle='--')
-    plt.title(title)
-    plt.xlabel('Holding Period (Days)')
-    plt.ylabel(ylabel if ylabel else y_col)  # Use a nicer label if provided
-    plt.gca().yaxis.set_major_formatter(mtick.PercentFormatter(1.0))  # multiplies by 100
+        fig.add_trace(go.Scatter(
+            x=df_plot['days'],
+            y=df_plot[y_col],
+            mode='lines+markers',
+            name=BUCKET_LABELS.get(bucket, bucket),
+            text=[f"N={int(c)}" for c in df_plot['count']],  # hover text
+            hovertemplate="Day %{x}<br>" + y_col + ": %{y}<br>%{text}<extra></extra>"
+        ))
 
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(output_file)
-    plt.close()
+    # Add SPY line if provided
+    if spy_summary is not None:
+        spy_plot = spy_summary[spy_summary['days'] <= max_days]
+        fig.add_trace(go.Scatter(
+            x=spy_plot['days'],
+            y=spy_plot[y_col],
+            mode='lines',
+            name='SPY',
+            line=dict(color='black', dash='dash', width=2)
+        ))
+
+    # Update layout
+    fig.update_layout(
+        title=title,
+        xaxis_title="Holding Period (Days)",
+        yaxis_title=y_col,
+        template="plotly_white"
+    )
+
+    return fig
 # -----------------------------
 # Process each horizon
 # -----------------------------
-df_all = pd.read_csv(csv_path)
+
+# -----------------------------
+# Parameters
+# -----------------------------
+HORIZONS = {
+    'short': {'prob_col': 'buy_prob_ml_short', 'max_days': 10},
+    'medium': {'prob_col': 'buy_prob_ml_medium', 'max_days': 100},
+    'long': {'prob_col': 'buy_prob_ml_long', 'max_days': 150}
+}
+
+BUCKET_LABELS = {
+    'buy': 'Buy',
+    'hold': 'Hold',
+    'sell': 'Sell',
+    'SPY':'SPY'
+}
+
+# Connect to Postgres
+conn = psycopg2.connect(
+    dbname=os.environ["POSTGRES_DB"],
+    user=os.environ["POSTGRES_USER"],
+    password=os.environ["POSTGRES_PASSWORD"],
+    host=os.environ["POSTGRES_HOST"],
+    port=os.environ["POSTGRES_PORT"]
+)
+
+# Load SPY prices
+spy_df = pd.read_sql("SELECT date, close_price FROM stock_data WHERE symbol='SPY' ORDER BY date ASC", conn)
+spy_df['date'] = pd.to_datetime(spy_df['date'])
+spy_df = spy_df.sort_values('date').reset_index(drop=True)
+
+df_all = pd.read_sql("SELECT * FROM stock_data WHERE symbol!='SPY' ORDER BY date ASC", conn)
 df_all.columns = df_all.columns.str.strip()
 df_all['date'] = pd.to_datetime(df_all['date'])
+
+conn.close()
 
 spy_summary = compute_spy_forward_returns(spy_df, max_days=150)
 
 # Create SPY summary for 2023 backtest window
 spy_summary_2023 = spy_df[spy_df['date'].dt.year == 2023].copy()
 spy_summary_2023 = compute_spy_forward_returns(spy_summary_2023, max_days=150)
-
 
 for horizon_name, horizon_params in HORIZONS.items():
     prob_col = horizon_params['prob_col']

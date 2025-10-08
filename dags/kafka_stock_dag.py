@@ -193,13 +193,6 @@ consumer_task = PythonOperator(
     trigger_rule=TriggerRule.ALL_DONE,  # <-- runs even if upstream skipped
 )
 
-fetch_task = PythonOperator(
-    task_id='fetch_stock_data',
-    python_callable=fetch_stock_data,
-    dag=dag,
-    trigger_rule=TriggerRule.ALL_SUCCESS,
-)
-
 compute_indicators_task = PythonOperator(
     task_id='compute_indicators',
     python_callable=run_compute_indicators,
@@ -207,12 +200,19 @@ compute_indicators_task = PythonOperator(
     trigger_rule=TriggerRule.ALL_DONE,  
 )
 
-analysis_task = PythonOperator(
-    task_id='run_analysis_script',
-    python_callable=run_analysis,
-    dag=dag,
-    trigger_rule=TriggerRule.ALL_DONE, 
-)
+# fetch_task = PythonOperator(
+#     task_id='fetch_stock_data',
+#     python_callable=fetch_stock_data,
+#     dag=dag,
+#     trigger_rule=TriggerRule.ALL_DONE,
+# )
+
+# analysis_task = PythonOperator(
+#     task_id='run_analysis_script',
+#     python_callable=run_analysis,
+#     dag=dag,
+#     trigger_rule=TriggerRule.ALL_DONE, 
+# )
 
 # email_task = EmailOperator(
 #     task_id='send_email',
@@ -236,4 +236,4 @@ analysis_task = PythonOperator(
 # )
 
 
-producer_task >> consumer_task >> compute_indicators_task >> fetch_task >> analysis_task
+producer_task >> consumer_task >> compute_indicators_task #>> fetch_task >> analysis_task >> email_task
