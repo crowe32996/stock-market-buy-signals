@@ -239,49 +239,54 @@ def summarize_buckets(df, bucket_col, max_days):
         summary['days'] = h
         summary_frames.append(summary)
     return pd.concat(summary_frames, ignore_index=True)
+import plotly.graph_objects as go
+import plotly.graph_objects as go
 
-def plot_bucket_curves_plotly(summary_df, bucket_col, title, y_col, spy_summary=None, color_map=None):
+def plot_bucket_curves_plotly(summary_df, bucket_col, title, y_col, y_label=None, spy_summary=None, color_map=None):
     """
-    Creates an interactive Plotly chart for bucketed performance.
-    
-    summary_df: dataframe with bucket performance (avg_return or win_rate)
-    bucket_col: column name for bucket labels
-    title: chart title
-    y_col: column to plot ('avg_return' or 'win_rate')
-    spy_summary: optional dataframe for SPY reference line
+    Creates an interactive Plotly chart for bucketed performance, formatted as percentages.
     """
     fig = go.Figure()
     max_days = summary_df['days'].max()
 
+    # Default label if not provided
+    y_label = y_label or y_col
+    y_label = f"{y_label} (%)"  # add percent symbol to axis label
+
     # Plot each bucket
     for bucket in summary_df[bucket_col].unique():
         df_plot = summary_df[summary_df[bucket_col] == bucket]
+        hovertemplate = (
+            "Day %{x}<br>"
+            + y_label + ": %{y:.2f}%<br>"
+            "%{text}<extra></extra>"
+        )
         fig.add_trace(go.Scatter(
             x=df_plot['days'],
-            y=df_plot[y_col],
+            y=df_plot[y_col] * 100,  # convert to percentage
             mode='lines+markers',
             name=BUCKET_LABELS.get(bucket, bucket),
-            text=[f"N={int(c)}" for c in df_plot['count']],  # hover text
-            hovertemplate="Day %{x}<br>" + y_col + ": %{y}<br>%{text}<extra></extra>",
+            text=[f"N={int(c)}" for c in df_plot['count']],
+            hovertemplate=hovertemplate,
             line=dict(color=color_map.get(bucket, 'grey')) if color_map else None
         ))
 
-    # Add SPY line if provided
+    # Add SPY benchmark line (also as %)
     if spy_summary is not None:
         spy_plot = spy_summary[spy_summary['days'] <= max_days]
         fig.add_trace(go.Scatter(
             x=spy_plot['days'],
-            y=spy_plot[y_col],
+            y=spy_plot[y_col] * 100,
             mode='lines',
             name='SPY',
             line=dict(color='black', dash='dash', width=2)
         ))
 
-    # Update layout
+    # Layout updates
     fig.update_layout(
         title=title,
         xaxis_title="Holding Period (Days)",
-        yaxis_title=y_col,
+        yaxis_title=y_label,
         template="plotly_white"
     )
 

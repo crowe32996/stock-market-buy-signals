@@ -197,6 +197,7 @@ with tab_overall:
         bucket_col=bucket_col,
         title="Average Return by Signal",
         y_col='avg_return',
+        y_label="Average Return",
         spy_summary=spy_summary,
         color_map= COLOR_MAP
     )
@@ -205,6 +206,7 @@ with tab_overall:
         bucket_col=bucket_col,
         title="Win Rate by Signal",
         y_col='win_rate',
+        y_label="Win Rate",
         spy_summary=spy_summary,
         color_map= COLOR_MAP
     )
@@ -229,6 +231,7 @@ with tab_2023:
         bucket_col=bucket_col,
         title="Average Return by Signal (2023)",
         y_col='avg_return',
+        y_label="Average Return",
         spy_summary=spy_summary_2023,
         color_map= COLOR_MAP
     )
@@ -237,6 +240,7 @@ with tab_2023:
         bucket_col=bucket_col,
         title="Win Rate by Signal (2023)",
         y_col='win_rate',
+        y_label="Win Rate",
         spy_summary=spy_summary_2023,
         color_map= COLOR_MAP
     )
