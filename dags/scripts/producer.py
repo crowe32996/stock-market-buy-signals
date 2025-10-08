@@ -1,20 +1,21 @@
-import os
 import time
 import json
-import requests
 from kafka import KafkaProducer
 from kafka import KafkaProducer
 from kafka.errors import NoBrokersAvailable
 import time
-import os
 from dotenv import load_dotenv
+import yfinance as yf
 
 load_dotenv()
-API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
-ALPHA_VANTAGE_URL = "https://www.alphavantage.co/query"
 KAFKA_BROKER = 'kafka:9092' 
 TOPIC = 'stock_data'  
 MAX_REQUESTS_PER_DAY = 25  # Alpha Vantage free limit
+LOCAL_STORAGE_FILE = "produced_messages.jsonl"  # jsonl = one JSON object per line
+
+def save_message_locally(record):
+    with open(LOCAL_STORAGE_FILE, "a") as f:
+        f.write(json.dumps(record) + "\n")  # append as JSON line
 
 for attempt in range(10):  
     try:
@@ -27,65 +28,40 @@ for attempt in range(10):
 else:
     raise Exception("Failed to connect to Kafka after 10 attempts")
 
-# Track number of API requests
-request_count = 0
-
-def load_request_count():
-    global request_count
+def fetch_stock_data_yf(symbol, start_date="2023-01-01", end_date=None):
+    """
+    Fetch daily historical data for a stock using yfinance.
+    Returns a dictionary in the same format as Alpha Vantage TIME_SERIES_DAILY.
+    """
     try:
-        with open("request_count.txt", "r") as f:
-            request_count = int(f.read())
-        print(f"Loaded request count: {request_count}")  # Debugging output
-    except FileNotFoundError:
-        request_count = 0
-        print(f"Request count file not found. Starting from 0.")  # Debugging output
-
-def save_request_count():
-    global request_count
-    with open("request_count.txt", "w") as f:
-        f.write(str(request_count))
-    print(f"Saved request count: {request_count}")  # Debugging output
-
-def can_make_request():
-    global request_count
-    print(f"[DEBUG] Request count before check: {request_count}")
-    #if request_count >= MAX_REQUESTS_PER_DAY:
-        #print(f"Daily API request limit ({MAX_REQUESTS_PER_DAY}) reached. Skipping API call.")
-        #return False
-    return True
-
-def fetch_stock_data(symbol):
-    global request_count
-
-    if not can_make_request():
+        ticker = yf.Ticker(symbol)
+        # Get last 100 trading days; you can adjust period as needed
+        df = ticker.history(start=start_date, end=end_date, interval="1d")  # fetch from start_date to today if end_date is None
+        if df.empty:
+            print(f"No data for {symbol}")
+            return None
+        
+        # Convert to dict in same structure as Alpha Vantage
+        stock_data = {}
+        for date, row in df.iterrows():
+            date_str = date.strftime("%Y-%m-%d")
+            stock_data[date_str] = {
+                '1. open': str(row['Open']),
+                '2. high': str(row['High']),
+                '3. low': str(row['Low']),
+                '4. close': str(row['Close']),
+                '5. volume': str(int(row['Volume']))
+            }
+        return stock_data
+    except Exception as e:
+        print(f"Error fetching {symbol} from yfinance: {e}")
         return None
 
-    request_count += 1
 
-    params = {
-        'function': 'TIME_SERIES_DAILY',
-        'symbol': symbol,
-        'apikey': API_KEY
-    }
-    response = requests.get(ALPHA_VANTAGE_URL, params=params)
-    data = response.json()
-
-    if "Time Series (Daily)" in data:
-        save_request_count()
-        return data["Time Series (Daily)"]
-    else:
-        print(f"Error fetching data for {symbol}: {data}")
-        return None
-
-def produce_stock_data(symbol):
-    stock_data = fetch_stock_data(symbol)
-    time.sleep(12) # max of 5 API calls per minute
-
+def produce_stock_data_yf(symbol):
+    stock_data = fetch_stock_data_yf(symbol)
     if stock_data:
-        #recent_dates = sorted(stock_data.keys(), reverse = True)[:8]
-        #for date in recent_dates:
         for date, values in stock_data.items():
-            #values = stock_data[date]
             record = {
                 'symbol': symbol,
                 'date': date,
@@ -96,26 +72,49 @@ def produce_stock_data(symbol):
                 'volume': int(values['5. volume']),
             }
             try:
+                # Send asynchronously (non-blocking)
                 producer.send(TOPIC, record)
-                print(f"Sent data for {symbol} on {date}")
+
+                # Save locally
+                save_message_locally(record)
+
+                # Print status once
+                print(f"Queued data for {symbol} on {date}")
+
             except Exception as e:
-                print(f"Error sending data for {symbol} on {date}: {e}")
-            time.sleep(0.05)  # To manage API rate limits
+                print(f"Failed sending data for {symbol} on {date}: {e}", file=sys.stderr)
+                raise
+            time.sleep(0.001)  # Small pause to avoid overwhelming Kafka
+
 if __name__ == "__main__":
-    load_request_count()
     symbols = [
-        'MSFT', 'TSLA', 'NVDA', 'META', 'GOOGL', 'AMZN', 'AMD', 'UBER', 'PLTR', 'SHOP',
-        'CRM', 'AAPL', 'NFLX', 'ABNB', 'COIN', 'LYFT', 'DIS', 'BAC', 'INTC', 'KO', 'PEP', 
-        'CSCO', 'XOM', 'WMT', 'PG', 'PFE'
+        # Large-cap tech / growth
+        'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'ADBE', 'CRM', 'NFLX', 'PYPL', 'SHOP', 'SQ',
+        # Broad ETFs / indexes
+        'SPY', 'QQQ', 'DIA', 'IWM', 'VTI', 'VOO',
+        # Consumer staples
+        'KO', 'PEP', 'PG', 'CL', 'MDLZ', 'COST', 'WMT', 'MCD', 'SBUX', 'YUM',
+        # Financials
+        'JPM', 'BAC', 'C', 'WFC', 'GS', 'MS', 'SCHW', 'AXP', 'V', 'MA',
+        # Healthcare & biotech
+        'JNJ', 'PFE', 'MRK', 'ABBV', 'LLY', 'BMY', 'GILD', 'AMGN', 'REGN', 'VRTX', 'CVS', 'UNH',
+        # Industrials & transportation
+        'GE', 'BA', 'CAT', 'DE', 'UPS', 'FDX', 'LMT', 'NOC', 'HON', 'RTX', 'TM', 'GM', 'F',
+        # Energy & materials
+        'XOM', 'CVX', 'COP', 'SLB', 'HAL', 'PSX', 'MPC', 'EOG', 'PXD', 'VLO', 'BHP', 'RIO',
+        # Communication / Media
+        'T', 'VZ', 'CMCSA', 'DIS', 'PINS', 'SNAP', 'TWTR', 'BABA', 'JD', 'TCEHY', 'SONY',
+        # REITs / real estate
+        'AMT', 'PLD', 'SPG', 'O', 'VNQ', 'DLR', 'EQIX',
+        # Emerging / midcaps / underperformers
+        'UBER', 'LYFT', 'ABNB', 'COIN', 'RBLX', 'ZM', 'NET', 'DOCU', 'ROKU', 'PTON', 'FSLY'
     ]
     
     for symbol in symbols:
-        if not can_make_request():
-            print(f"Max API requests reached. Stopping producer.")
-            break
-        produce_stock_data(symbol)
-    # Only send end-of-data after ALL symbols are produced
-    time.sleep(15)
+        produce_stock_data_yf(symbol)
+    
+    # Send end-of-data after all symbols are produced
+    #time.sleep(2)  # shorter pause is fine
     producer.send(TOPIC, {'end_of_data': True})
     print("Sent final end-of-data signal.")
     producer.flush()

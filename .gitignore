@@ -5,3 +5,4 @@ __pycache__/
 replace.txt
 remove_password.py
 /.git
+/logs
