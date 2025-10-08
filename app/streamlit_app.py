@@ -334,8 +334,11 @@ with tab_recommend:
 with tab_overall:
     st.subheader(f"Signal Performance 2024-current ({horizon.capitalize()} Horizon)")
     
-    avg_return_file = f"../output/avg_return_buckets_{horizon.lower()}.png"
-    winrate_file = f"../output/winrate_buckets_{horizon.lower()}.png"
+    #avg_return_file = f"../output/avg_return_buckets_{horizon.lower()}.png" if running locally
+    #winrate_file = f"../output/winrate_buckets_{horizon.lower()}.png"
+
+    avg_return_file = f"output/avg_return_buckets_{horizon.lower()}.png"
+    winrate_file = f"output/winrate_buckets_{horizon.lower()}.png"
     
     st.markdown("### Average Return by Signal")
     st.image(avg_return_file, use_container_width=True)
@@ -349,8 +352,10 @@ with tab_overall:
 with tab_2023:
     st.subheader(f"2023 Backtest ({horizon.capitalize()} Horizon)")
     
-    avg_return_2023_file = f"../output/avg_return_buckets_{horizon.lower()}_2023.png"
-    winrate_2023_file = f"../output/winrate_buckets_{horizon.lower()}_2023.png"
+    #avg_return_2023_file = f"../output/avg_return_buckets_{horizon.lower()}_2023.png" if running locally
+    #winrate_2023_file = f"../output/winrate_buckets_{horizon.lower()}_2023.png"
+    avg_return_2023_file = f"output/avg_return_buckets_{horizon.lower()}_2023.png"
+    winrate_2023_file = f"output/winrate_buckets_{horizon.lower()}_2023.png"
     
     st.markdown("### Average Return by Signal (2023)")
     st.image(avg_return_2023_file, use_container_width=True)
