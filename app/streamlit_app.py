@@ -91,7 +91,7 @@ for horizon_name, params in HORIZONS.items():
     # 2024-current
     bucket_summaries[horizon_name] = get_bucket_summary(df_all, prob_col, bucket_col, max_days)
 
-    # 2023 backtest
+    # 2023 historical
     df_2023 = df_all[df_all['date'].dt.year == 2023].copy()
     bucket_summaries_2023[horizon_name] = get_bucket_summary(df_2023, prob_col, bucket_col, max_days)
 
@@ -142,7 +142,7 @@ st.markdown(
 )
 
 tab_recommend, tab_overall, tab_2023, tab_methodology = st.tabs(
-    ["Stock Recommendations", "Signal Performance (2024-current)", "2023 Backtest", "Methodology"]
+    ["Stock Recommendations", "Signal Performance (2024-current)", "2023 Historical Data", "Methodology"]
 )
 
 # --- Tab 1: Daily Stock Signals ---
@@ -213,9 +213,9 @@ with tab_overall:
     st.plotly_chart(fig_avg_return, use_container_width=True)
     st.plotly_chart(fig_winrate, use_container_width=True)
 
-# --- Tab 3: 2023 Backtest ---
+# --- Tab 3: 2023 Historical ---
 with tab_2023:
-    st.subheader(f"2023 Backtest ({horizon} Horizon)")
+    st.subheader(f"2023 Historical Data ({horizon} Horizon)")
     summary_df_2023_filtered = get_summary_for_tab(
         df_all,
         horizon_key,
@@ -288,9 +288,8 @@ with tab_methodology:
     st.subheader("Model Effectiveness")
     st.markdown("""
     The different signals are plotted over time to show how each signal for each time horizon fares. 
-    - Note the "Signal Performance" tab to see this plot, but keep in mind that the Random Classifier requires training data which can result in overfitting. 
-    - The "2023 Backtest" tab looks at a time range completely outside of the training dataset to further evaluate performance of the signals.
-    - Future versions will increase the backtesting window for further evaluation.
+    - Note the "Signal Performance" tab to see this plot, and note that this data is all out-of-sample (the model is not learned on any data from this range, this is purely evaluation of the model effectiveness). 
+    - The "2023 Historical Data" includes data that is part of the trained range (2021-2023), so returns may show higher due to overfitting.
     """)
 
     st.markdown("---")

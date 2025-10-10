@@ -138,7 +138,9 @@ def compute_indicators(df):
 
     return df
 
-def train_ml(df, horizon_days, spy_df, horizon_name):
+def train_ml(df, horizon_days, spy_df, horizon_name, 
+             train_start='2021-01-01', train_end='2023-12-31',
+             eval_start='2024-01-01', eval_end=None):
     """
     Train RF on 2024–2025 data and backtest on 2023, but predict ML probabilities for all years.
     """
@@ -157,10 +159,13 @@ def train_ml(df, horizon_days, spy_df, horizon_name):
 
     df['date'] = pd.to_datetime(df['date'])
 
-    # Training on 2024+ only
-    train_df = df[df['date'] >= '2024-01-01']
-    # Evaluation on 2023 only
-    test_eval_df = df[(df['date'] >= '2023-01-01') & (df['date'] < '2024-01-01')]
+    # Training on custom period
+    train_df = df[(df['date'] >= train_start) & (df['date'] <= train_end)]
+    # Evaluation period
+    if eval_end is not None:
+        eval_df = df[(df['date'] >= eval_start) & (df['date'] <= eval_end)]
+    else:
+        eval_df = df[df['date'] >= eval_start]
 
     # Features for ML
     features = [f for f in FEATURES_BY_HORIZON[horizon_name] if f not in ('score','buy_signal')]
@@ -174,7 +179,7 @@ def train_ml(df, horizon_days, spy_df, horizon_name):
 
     # Train RandomForest
     X_train, y_train = train_df[features], train_df['outperformed']
-    rf = RandomForestClassifier(n_estimators=200, max_depth=6, random_state=42)
+    rf = RandomForestClassifier(n_estimators=100, max_depth=5, random_state=42, n_jobs=-1)
     rf.fit(X_train, y_train)
 
     # ✅ Predict ML probabilities for all rows (after dropping NA features)
@@ -184,7 +189,6 @@ def train_ml(df, horizon_days, spy_df, horizon_name):
         X_pred = predict_df[features]
         df.loc[predict_df.index, f'buy_prob_ml_{horizon_name}'] = rf.predict_proba(X_pred)[:, 1]
 
-    # df is now ready for signals across all years
     return df, rf
 
 
@@ -209,7 +213,7 @@ def evaluate_signals(df, horizon_name):
     }
     return results
 
-def main(symbols):
+def main(symbols, train_start='2021-01-01', train_end='2023-12-31', eval_start='2024-01-01'):
     all_dfs = []
     
     # Fetch SPY
@@ -227,14 +231,11 @@ def main(symbols):
         
         df = pd.DataFrame(rows, columns=[desc[0] for desc in cursor.description])
         df['date'] = pd.to_datetime(df['date'])
-        
-        # Explicitly add 'symbol' column
         df['symbol'] = symbol
         
         df = compute_indicators(df)
         all_dfs.append(df)
     
-    # Debug: check if any DataFrames were fetched
     if not all_dfs:
         print("⚠️ No stock data fetched for any symbol. all_dfs is empty!")
     else:
@@ -247,19 +248,28 @@ def main(symbols):
     print(f"After concat, df_all shape: {df_all.shape}, columns: {list(df_all.columns)}")
     
     eval_results = []
+    rf_models = {}  # store trained models if needed
     for name in HORIZONS:
-        df_all, rf_model = train_ml(df_all, HORIZONS[name], spy_df, horizon_name=name)
+        df_all, rf_model = train_ml(
+            df_all,
+            HORIZONS[name],
+            spy_df,
+            horizon_name=name,
+            train_start=train_start,
+            train_end=train_end,
+            eval_start=eval_start
+        )
+        rf_models[name] = rf_model
         result = evaluate_signals(df_all, horizon_name=name)
         eval_results.append(result)
     
     print("Evaluation results vs SPY:")
     print(pd.DataFrame(eval_results))
     
-    # Write CSVs
     df_all.to_csv(OUTPUT_ML_CSV, index=False)
     print(f"✅ CSV written: {OUTPUT_ML_CSV}")
     
-    return df_all, eval_results
+    return df_all, eval_results, rf_models
 
 def add_threshold_signals_and_forward_returns(df, threshold=0.75, max_days=150):
     """
@@ -290,8 +300,10 @@ def update_stock_data(df, cursor, conn):
             buy_ml_long = %s
         WHERE symbol = %s AND date = %s
     """
-    for _, row in df.iterrows():
-        cursor.execute(update_sql, (
+
+    # Convert DataFrame rows to list of tuples
+    data_to_update = [
+        (
             row['buy_prob_ml_short'],
             row['buy_prob_ml_medium'],
             row['buy_prob_ml_long'],
@@ -300,13 +312,23 @@ def update_stock_data(df, cursor, conn):
             row['buy_ml_long'],
             row['symbol'],
             row['date']
-        ))
+        )
+        for _, row in df.iterrows()
+    ]
+
+    cursor.executemany(update_sql, data_to_update)
     conn.commit()
+
 
 if __name__ == "__main__":
     cursor.execute("SELECT DISTINCT symbol FROM stock_data WHERE symbol != 'SPY'")
     symbols = [row[0] for row in cursor.fetchall()]
-    df_all, eval_results = main(symbols)
+    df_all, eval_results, rf_models = main(
+        symbols,
+        train_start='2021-01-01',
+        train_end='2023-12-31',
+        eval_start='2024-01-01'
+    )
     # Add threshold-based buy signals and forward returns
     threshold = 0.75
     df_all = add_threshold_signals_and_forward_returns(df_all, threshold=threshold, max_days=150)

@@ -1,9 +1,7 @@
 import time
 import json
 from kafka import KafkaProducer
-from kafka import KafkaProducer
 from kafka.errors import NoBrokersAvailable
-import time
 from dotenv import load_dotenv
 import yfinance as yf
 
@@ -19,7 +17,12 @@ def save_message_locally(record):
 
 for attempt in range(10):  
     try:
-        producer = KafkaProducer(bootstrap_servers=[KAFKA_BROKER], value_serializer=lambda v: json.dumps(v).encode('utf-8'))
+        producer = KafkaProducer(
+            bootstrap_servers=[KAFKA_BROKER],
+            value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+            linger_ms=10,       # Wait up to 10ms to batch messages
+            batch_size=16384    # 16 KB batch size
+        )
         print("Connected to Kafka!")
         break
     except NoBrokersAvailable:
@@ -28,7 +31,7 @@ for attempt in range(10):
 else:
     raise Exception("Failed to connect to Kafka after 10 attempts")
 
-def fetch_stock_data_yf(symbol, start_date="2023-01-01", end_date=None):
+def fetch_stock_data_yf(symbol, start_date="2021-01-01", end_date=None):
     """
     Fetch daily historical data for a stock using yfinance.
     Returns a dictionary in the same format as Alpha Vantage TIME_SERIES_DAILY.
@@ -61,6 +64,8 @@ def fetch_stock_data_yf(symbol, start_date="2023-01-01", end_date=None):
 def produce_stock_data_yf(symbol):
     stock_data = fetch_stock_data_yf(symbol)
     if stock_data:
+        local_batch = []  # start a batch for local storage
+
         for date, values in stock_data.items():
             record = {
                 'symbol': symbol,
@@ -71,20 +76,29 @@ def produce_stock_data_yf(symbol):
                 'low_price': float(values['3. low']),
                 'volume': int(values['5. volume']),
             }
+
             try:
                 # Send asynchronously (non-blocking)
                 producer.send(TOPIC, record)
 
-                # Save locally
-                save_message_locally(record)
+                # Add to local batch instead of writing immediately
+                local_batch.append(record)
+                if len(local_batch) >= 100:
+                    with open(LOCAL_STORAGE_FILE, "a") as f:
+                        f.writelines([json.dumps(r) + "\n" for r in local_batch])
+                    local_batch = []
 
-                # Print status once
+                # Print status
                 print(f"Queued data for {symbol} on {date}")
 
             except Exception as e:
                 print(f"Failed sending data for {symbol} on {date}: {e}", file=sys.stderr)
                 raise
-            time.sleep(0.001)  # Small pause to avoid overwhelming Kafka
+
+        # Flush remaining messages to local file
+        if local_batch:
+            with open(LOCAL_STORAGE_FILE, "a") as f:
+                f.writelines([json.dumps(r) + "\n" for r in local_batch])
 
 if __name__ == "__main__":
     symbols = [

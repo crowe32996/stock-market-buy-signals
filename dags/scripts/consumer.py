@@ -14,7 +14,7 @@ TOPIC = 'stock_data'
 consumer = KafkaConsumer(
     TOPIC,
     bootstrap_servers=[KAFKA_BROKER],
-    group_id='stock_consumer_batch_3',
+    group_id='stock_consumer_batch_4',
     auto_offset_reset='earliest',
     enable_auto_commit=False,
     consumer_timeout_ms=10000,
