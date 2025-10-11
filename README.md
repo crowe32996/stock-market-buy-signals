@@ -9,6 +9,17 @@ Explore stock buy signals interactively in the Streamlit app:
 [Open Streamlit App](https://stock-market-buy-signals-ftwnfk6lg32nxd7tcfyjpk.streamlit.app)
 
 This project is a data pipeline that generates automated buy signal alerts for selected stocks and evaluates the effectiveness of technical indicators in predicting future performance. 
+
+---
+
+## Stock Buy Signal Average Return
+In out-of-sample data from 2024-present, the average return % is greater for those with buy signals than hold and sell, as well as S&P 500 (SPY). 
+Specifically for the long horizon, as of 10/10/2025, the average return over 150 days is 13.8% for those with "buy" signals, compared to 7.2% for SPY and "hold" signals, and -0.5% for those with "sell" signals.
+See streamlit link for more up-to-date, interactive visuals across all horizons and win rates. 
+![Average Return](screenshots/signal_performance_long.png)
+
+---
+
 ## Methodology
 
 ### Random Forest Model
@@ -49,22 +60,12 @@ Probabilities from the Random Forest classifier are bucketed as:
 ⚠️ **Disclaimer**  
 The information presented is for **educational and informational purposes only** and **does not constitute financial, investment, or trading advice**. Past performance does not guarantee future results.
 
----
-
-## Stock Buy Signal Average Return
-In out-of-sample data from 2024-present, the average return % is greater for those with buy signals than hold and sell, as well as S&P 500 (SPY). 
-Specifically for the long horizon, as of 10/10/2025, the average return over 150 days is 13.8% for those with "buy" signals, compared to 7.2% for SPY and "hold" signals, and -0.5% for those with "sell" signals.
-See streamlit link for more up-to-date, interactive visuals across all horizons and win rates. 
-![Average Return](screenshots/signal_performance_long.png)
-
----
-
 
 ## Architecture
 
 1. **Dockerized Environment**: The entire stack (Airflow, Kafka, PostgreSQL, and pipeline scripts) runs inside Docker containers using Docker Compose for easy, consistent setup.
-2. **Kafka Producer**: Fetches daily stock data for a list of symbols from Alpha Vantage and publishes to a Kafka topic. Note the run_producer Airflow variable that can be used to skip producer step to avoid hitting API limits. Alpha Vantage allows 25 requests per day, so with 25 stocks in pipeline, producer can only be run 1x per day.
-3. **Kafka Consumer**: Reads stock data from Kafka, stores it in PostgreSQL, and computes technical indicators (SMA, RSI, MACD, buy signals).
+2. **Kafka Producer**: Fetches daily stock data for a list of symbols from Yahoo Finance and publishes to a Kafka topic. 
+3. **Kafka Consumer**: Reads stock data from Kafka, stores it in PostgreSQL, and computes technical indicators to feed into Random Forest model for signal outputs.
 4. **PostgreSQL Database**: Stores raw stock data and calculated indicators for analysis and reporting.
 5. **Airflow DAG**: Orchestrates running the producer, consumer, fetching results, running random forest ML models, and outputting probabilities of "buy" signal.
 7. **Streamlit App**: Tracks most recent "Buy", "Hold", and "Sell" signals for each stock, analyzes out-of-sample data signal results from 2024-present, and provides historical data.
