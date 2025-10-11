@@ -9,7 +9,7 @@ load_dotenv()
 KAFKA_BROKER = 'kafka:9092' 
 TOPIC = 'stock_data'  
 MAX_REQUESTS_PER_DAY = 25  # Alpha Vantage free limit
-LOCAL_STORAGE_FILE = "produced_messages.jsonl"  # jsonl = one JSON object per line
+LOCAL_STORAGE_FILE = "produced_messages.jsonl"  
 
 def save_message_locally(record):
     with open(LOCAL_STORAGE_FILE, "a") as f:
@@ -38,13 +38,11 @@ def fetch_stock_data_yf(symbol, start_date="2021-01-01", end_date=None):
     """
     try:
         ticker = yf.Ticker(symbol)
-        # Get last 100 trading days; you can adjust period as needed
         df = ticker.history(start=start_date, end=end_date, interval="1d")  # fetch from start_date to today if end_date is None
         if df.empty:
             print(f"No data for {symbol}")
             return None
         
-        # Convert to dict in same structure as Alpha Vantage
         stock_data = {}
         for date, row in df.iterrows():
             date_str = date.strftime("%Y-%m-%d")
@@ -128,7 +126,6 @@ if __name__ == "__main__":
         produce_stock_data_yf(symbol)
     
     # Send end-of-data after all symbols are produced
-    #time.sleep(2)  # shorter pause is fine
     producer.send(TOPIC, {'end_of_data': True})
     print("Sent final end-of-data signal.")
     producer.flush()

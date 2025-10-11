@@ -68,12 +68,6 @@ def summarize_buckets(df, bucket_col, max_days):
 def plot_bucket_curves_plotly(summary_df, bucket_col, title, y_col, spy_summary=None):
     """
     Creates an interactive Plotly chart for bucketed performance.
-    
-    summary_df: dataframe with bucket performance (avg_return or win_rate)
-    bucket_col: column name for bucket labels
-    title: chart title
-    y_col: column to plot ('avg_return' or 'win_rate')
-    spy_summary: optional dataframe for SPY reference line
     """
     fig = go.Figure()
     max_days = summary_df['days'].max()

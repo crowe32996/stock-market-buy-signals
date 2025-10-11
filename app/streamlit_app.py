@@ -147,7 +147,7 @@ tab_recommend, tab_overall, tab_2023, tab_methodology = st.tabs(
 
 # --- Tab 1: Daily Stock Signals ---
 with tab_recommend:
-    st.subheader(f"📅 Daily Stock Signals ({horizon} Term)")
+    st.subheader(f"Daily Stock Signals ({horizon} Term)")
 
     df_sorted = df_all.sort_values(['symbol','date'])
     latest_close_per_symbol = df_sorted.groupby('symbol')['close_price'].last().to_dict()
@@ -252,7 +252,7 @@ with tab_methodology:
     
     st.subheader("Random Forest Model")
     st.markdown("""
-    We use a **Random Forest classifier** to predict whether a stock will generate a **buy signal** over a given horizon. 
+    A **Random Forest classifier** is used to predict whether a stock will generate a **buy signal** over a given horizon. 
 
     - A **Random Forest** is an ensemble of decision trees, each trained on random subsets of features and data.
     - Each tree outputs a prediction (buy / not buy), and the final prediction is the **majority vote** of all trees.

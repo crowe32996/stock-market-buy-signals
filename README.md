@@ -9,32 +9,56 @@ Explore stock buy signals interactively in the Streamlit app:
 [Open Streamlit App](https://stock-market-buy-signals-ftwnfk6lg32nxd7tcfyjpk.streamlit.app)
 
 This project is a data pipeline that generates automated buy signal alerts for selected stocks and evaluates the effectiveness of technical indicators in predicting future performance. 
+## Methodology
 
-A buy signal is triggered when all of the following conditions are met:
-- MACD > Signal line: The Moving Average Convergence/Divergence line (difference between the 12-day and 26-day Exponential Moving Averages/EMA) is above its 9-day EMA signal line, indicating positive momentum.
+### Random Forest Model
+A **Random Forest classifier** is used to predict whether a stock will generate a **buy signal** over a given horizon:
 
-- RSI < 65: The Relative Strength Index is below 65, meaning the stock is not yet overbought and has room to grow.
+- A **Random Forest** is an ensemble of decision trees, each trained on random subsets of features and data.  
+- Each tree outputs a prediction (buy / not buy), and the final prediction is the **majority vote** of all trees.  
+- Separate models are trained for **short, medium, and long horizons** to create different trading strategies.  
+- The model outputs a **probability of a buy signal**, which is then bucketed into buy, hold, or sell categories.
 
-- 10-day SMA > 50-day SMA: The 10-day Simple Moving Average is above the longer-term 50-day SMA, indicating an upward trend.
+**Advantages:**
+- Handles large numbers of features well.  
+- Strong in ruling out noisy indicators.  
+- Provides probability/confidence levels, not just binary predictions.
 
-- Closing price > 10-day SMA: The current closing price is above the 10-day SMA, showing strength and confirming the recent positive momentum.
+### Feature Inputs
+The Random Forest model uses a combination of **technical indicators**, **price/volume metrics**, and **momentum/volatility indicators**, calculated separately for each horizon:
 
-This version tracks 25 commonly-traded stocks to stay within free API limits of 25 hits per day, but future iterations will allow for rotating different stock symbols daily to further increase sample size. Future versions will also involve backtesting logic and indicator thresholds, to determine the most effective logic in assigning buy signals.
+- **Price & Volume**: closing price and number of trades.  
+- **Simple Moving Averages (SMA)**: short-term (3,5,10), medium (10,20,50), long-term (20,50,100) to capture trends over different horizons.  
+- **Exponential Moving Averages (EMA)**: similar to SMA but weights recent prices more heavily.  
+- **MACD & Signal Line**: measures momentum from the difference between fast and slow EMAs.  
+- **RSI (Relative Strength Index)**: momentum indicator ranging from 0–100; <30 is oversold, >70 is overbought.  
+- **Momentum & Volatility Features**: measures of the speed and variability of price changes.
 
+### Buy Signal Definition
+Probabilities from the Random Forest classifier are bucketed as:
+
+- **Buy**: top 20% probability  
+- **Hold**: middle 60% probability  
+- **Sell**: bottom 20% probability
+
+### Model Effectiveness
+- The model's signals are evaluated over time and plotted in the **Signal Performance** tab.  
+- The evaluation uses **out-of-sample data** to ensure results are not biased by training data.  
+- Historical data (e.g., 2021–2023) may show higher returns due to overfitting, so focus on the out-of-sample evaluation for realistic performance.
+
+⚠️ **Disclaimer**  
+The information presented is for **educational and informational purposes only** and **does not constitute financial, investment, or trading advice**. Past performance does not guarantee future results.
 
 ---
 
 ## Stock Buy Signal Average Return
-Across all timeframes, the average return % is greater for those with buy signals:
-![Win Rate](screenshots/avg_return_by_buy_signal_streamlit.png)
+In out-of-sample data from 2024-present, the average return % is greater for those with buy signals than hold and sell, as well as S&P 500 (SPY). 
+Specifically for the long horizon, as of 10/10/2025, the average return over 150 days is 13.8% for those with "buy" signals, compared to 7.2% for SPY and "hold" signals, and -0.5% for those with "sell" signals.
+See streamlit link for more up-to-date, interactive visuals across all horizons and win rates. 
+![Average Return](screenshots/signal_performance_long.png)
 
 ---
 
-## Stock Buy Signal Win Rate
-Across all timeframes, win rate (% of investments with positive return) is greater for those with buy signals:
-![Win Rate](screenshots/win_rate_by_buy_signal_streamlit.png)
-
----
 
 ## Architecture
 
@@ -42,9 +66,8 @@ Across all timeframes, win rate (% of investments with positive return) is great
 2. **Kafka Producer**: Fetches daily stock data for a list of symbols from Alpha Vantage and publishes to a Kafka topic. Note the run_producer Airflow variable that can be used to skip producer step to avoid hitting API limits. Alpha Vantage allows 25 requests per day, so with 25 stocks in pipeline, producer can only be run 1x per day.
 3. **Kafka Consumer**: Reads stock data from Kafka, stores it in PostgreSQL, and computes technical indicators (SMA, RSI, MACD, buy signals).
 4. **PostgreSQL Database**: Stores raw stock data and calculated indicators for analysis and reporting.
-5. **Airflow DAG**: Orchestrates running the producer, consumer, fetching results, running buy signnal effectiveness analysis, and emailing reports and visuals.
-6. **Email Notification**: Sends a daily report with stock data and computed signals.
-7. **Streamlit App**: Tracks most recent buy signals for each stock, analysis of signal effectiveness, and raw data
+5. **Airflow DAG**: Orchestrates running the producer, consumer, fetching results, running random forest ML models, and outputting probabilities of "buy" signal.
+7. **Streamlit App**: Tracks most recent "Buy", "Hold", and "Sell" signals for each stock, analyzes out-of-sample data signal results from 2024-present, and provides historical data.
 
 ---
 ## Screenshots
@@ -86,14 +109,8 @@ git clone https://github.com/crowe32996/stock-market-buy-signals
 cd stock-market-buy-signals
 ```
 
-### 2. Configure Alpha Vantage API Key
 
-- Get a free API key from Alpha Vantage
-
-- Open dags/scripts/producer.py and replace the API_KEY value.
-
-
-### 3. Build and start the Docker containers
+### 2. Build and start the Docker containers
 
 This will:
 - Start Kafka, Postgres, and Airflow (webserver + scheduler)
@@ -106,7 +123,7 @@ docker-compose up -d --build
 
 ### 4. Initialize Airflow (First Time Only)
 
-Replace the following with your chosen credentials:
+Replace the following with your chosen credentials, and set a password:
 
 ```bash
 docker-compose run airflow-webserver db init
@@ -120,8 +137,7 @@ The DAG uses an Airflow Variable `run_producer` to control whether the Kafka pro
 
 - **Variable name:** `run_producer`
 - **Type:** String (`true` or `false`)
-- **Default behavior:** Automatically set to `"true"`, where the DAG updates the messages produced by the Alpha Vantage API.
-- The API request limit is 25 requests per day, so set it to `"false"` if testing/re-running other tasks for the second time in a day and beyond. 
+- **Default behavior:** Automatically set to `"true"`, where the DAG updates the messages produced by Yahoo Finance.
 
 - In the Airflow UI, go to **Admin > Variables**, and create a new variable:
   - Key: `run_producer`
@@ -146,41 +162,28 @@ Trigger the DAG kafka_stock_pipeline. Each run will:
 
 - Save results to CSV
 
-- Email the stock summary (Update recipient email in dags/kafka_stock_dag.py)
+- Optionally email the stock summary (Uncomment and recipient email in dags/kafka_stock_dag.py)
 
+### 7. Run the Streamlit App
+Once your pipeline is running and the indicators/signals are generated, you can view the interactive Streamlit dashboard:
 
-## Data and Indicators
-Indicators computed:
+1. Navigate to the `app` directory:
+```bash
+cd app
+```
 
-- SMA 10-day and 50-day
+2. Run the streamlit app:
+```bash
+streamlit run streamlit_app.py
+```
 
-- RSI (Relative Strength Index)
-
-- MACD (Moving Average Convergence Divergence)
-
-- Buy signal based on combined indicator logic
-
-## Quick Analysis Summary
-Included is a Python visualization of:
-
-- Buy signal performance across multiple return horizons (1, 5, 10, 20, 30 days)
-
-Metrics:
-
-- Average return
-
-- Win rate (percentage of positive returns)
-
-Note: Sample sizes are currently small and results are preliminary. Data volume will grow over time as the pipeline runs daily.
 
 ## Future Enhancements
-- Expand stock universe beyond initial 25 symbols and rotate stocks per day
-
-- Improve buy signal logic and introduce multiple methodologies for comparison
-
-- Add visual dashboards for live tracking of buy signal effectiveness
+- Expand stock universe beyond existing ~120 symbols 
 
 - Deploy Docker-based pipeline onto Kubernetes
+
+- Expose signal results as API using FastAPI and offer requests on RapidAPI
 
 ## License
 MIT License © Charlie Rowe
