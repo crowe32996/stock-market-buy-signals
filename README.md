@@ -63,12 +63,14 @@ The information presented is for **educational and informational purposes only**
 
 ## Architecture
 
+![Architecture Diagram](screenshots/architecture_diagram.png)
+
 1. **Dockerized Environment**: The entire stack (Airflow, Kafka, PostgreSQL, and pipeline scripts) runs inside Docker containers using Docker Compose for easy, consistent setup.
 2. **Kafka Producer**: Fetches daily stock data for a list of symbols from Yahoo Finance and publishes to a Kafka topic. 
 3. **Kafka Consumer**: Reads stock data from Kafka, stores it in PostgreSQL, and computes technical indicators to feed into Random Forest model for signal outputs.
-4. **PostgreSQL Database**: Stores raw stock data and calculated indicators for analysis and reporting.
+4. **PostgreSQL Database**: Stores raw stock data, calculated indicators, and Random Forest outputs for analysis and reporting.
 5. **Airflow DAG**: Orchestrates running the producer, consumer, fetching results, running random forest ML models, and outputting probabilities of "buy" signal.
-7. **Streamlit App**: Tracks most recent "Buy", "Hold", and "Sell" signals for each stock, analyzes out-of-sample data signal results from 2024-present, and provides historical data.
+7. **Streamlit App**: Tracks most recent "Buy", "Hold", and "Sell" signals for each stock, analyzes out-of-sample data signal results from 2024-present, and provides historical data. The app references a CSV output of the PostgreSQL database is deployed on Streamlit Cloud
 
 ---
 ## Screenshots
