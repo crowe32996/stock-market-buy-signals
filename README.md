@@ -2,7 +2,7 @@
 
 ## Overview
 
-Explore stock buy signals interactively in the Streamlit app:
+Explore ML-based stock buy signals interactively in the Streamlit app:
 
 ![Stock Buy Signals](screenshots/streamlit_app.png)
 
