@@ -291,7 +291,7 @@ with tab_methodology:
     - Note the "Signal Performance" tab to see this plot, and note that this data is all out-of-sample (the model is not learned on any data from this range, this is purely evaluation of the model effectiveness). 
     - The "2023 Historical Data" includes data that is part of the trained range (2021-2023), so returns may show higher due to overfitting.
     
-    Project Repository: Charlie Rowe - [Stock Market ML-based Buy Signals](https://github.com/crowe32996/stock-market-buy-signals)**
+    Project Repository: Charlie Rowe - [Stock Market ML-based Buy Signals](https://github.com/crowe32996/stock-market-buy-signals)
     """)
 
     st.markdown("---")
