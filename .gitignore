@@ -6,3 +6,4 @@ replace.txt
 remove_password.py
 /.git
 /logs
+api/venv/

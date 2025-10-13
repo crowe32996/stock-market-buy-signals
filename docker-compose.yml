@@ -113,6 +113,23 @@ services:
     networks:
       - airflow_network
       
+  api:
+    build: ./api
+    container_name: stock-api
+    environment:
+      POSTGRES_DB: stock_market_av
+      POSTGRES_USER: ec2-user
+      POSTGRES_PASSWORD: Lefevre102!
+      POSTGRES_HOST: postgres
+    ports:
+      - "8000:8000"
+    env_file: .env
+    depends_on:
+      - postgres
+    networks:
+      - airflow_network
+
+
 volumes:
   kafka_data:
   postgres_data:
