@@ -1,9 +1,10 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 import psycopg2
 import os
 from dotenv import load_dotenv
 from typing import List, Optional
+from datetime import datetime
 
 load_dotenv()
 
@@ -59,109 +60,61 @@ def test_db():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Get all stocks (limit optional)
-@app.get("/stocks", response_model=List[StockData])
-def get_all_stocks(limit: int = 100):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute(f"""
-        SELECT symbol, date, open_price, close_price, high_price, low_price, volume, 
-               SMA_10, SMA_50, RSI, MACD, Signal, buy_signal
-        FROM stock_data
-        ORDER BY date DESC
-        LIMIT {limit}
-    """)
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-    
-    stocks = [StockData(
-        symbol=row[0],
-        date=row[1].isoformat(),
-        open_price=row[2],
-        close_price=row[3],
-        high_price=row[4],
-        low_price=row[5],
-        volume=row[6],
-        SMA_10=row[7],
-        SMA_50=row[8],
-        RSI=row[9],
-        MACD=row[10],
-        Signal=row[11],
-        buy_signal=row[12]
-    ) for row in rows]
-    
-    return stocks
+# Minimal response model
+class SignalResponse(BaseModel):
+    date: str
+    symbol: str
+    horizon: str
+    buy_prob: Optional[float]
+    buy_signal: Optional[bool]
 
-# Get stock by symbol
-@app.get("/stocks/{symbol}", response_model=List[StockData])
-def get_stock_by_symbol(symbol: str, limit: int = 100):
+@app.get("/signals", response_model=List[SignalResponse])
+def get_signals(
+    date: str,
+    horizon: str = Query(..., description="short, medium, or long"),
+    symbol: Optional[str] = None
+):
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute(f"""
-        SELECT symbol, date, open_price, close_price, high_price, low_price, volume, 
-               SMA_10, SMA_50, RSI, MACD, Signal, buy_signal
-        FROM stock_data
-        WHERE symbol = %s
-        ORDER BY date DESC
-        LIMIT %s
-    """, (symbol.upper(), limit))
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-    
-    if not rows:
-        raise HTTPException(status_code=404, detail="Stock not found")
-    
-    stocks = [StockData(
-        symbol=row[0],
-        date=row[1].isoformat(),
-        open_price=row[2],
-        close_price=row[3],
-        high_price=row[4],
-        low_price=row[5],
-        volume=row[6],
-        SMA_10=row[7],
-        SMA_50=row[8],
-        RSI=row[9],
-        MACD=row[10],
-        Signal=row[11],
-        buy_signal=row[12]
-    ) for row in rows]
-    
-    return stocks
 
-# Get only buy signals
-@app.get("/buy_signals", response_model=List[StockData])
-def get_buy_signals(limit: int = 100):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute(f"""
-        SELECT symbol, date, open_price, close_price, high_price, low_price, volume, 
-               SMA_10, SMA_50, RSI, MACD, Signal, buy_signal
+    # Map horizon to column
+    horizon_map = {
+        "short": "buy_prob_ml_short",
+        "medium": "buy_prob_ml_medium",
+        "long": "buy_prob_ml_long"
+    }
+    if horizon not in horizon_map:
+        raise HTTPException(status_code=400, detail="Invalid horizon")
+
+    prob_col = horizon_map[horizon]
+
+    # Build query
+    query = f"""
+        SELECT date, symbol, {prob_col}, 
+               CASE WHEN {prob_col} >= 0.5 THEN TRUE ELSE FALSE END AS buy_signal
         FROM stock_data
-        WHERE buy_signal = TRUE
-        ORDER BY date DESC
-        LIMIT {limit}
-    """)
+        WHERE date = %s
+            AND {prob_col} IS NOT NULL
+
+    """
+    params = [date]
+
+    if symbol:
+        query += " AND symbol = %s"
+        params.append(symbol.upper())
+
+    cur.execute(query, tuple(params))
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    
-    stocks = [StockData(
-        symbol=row[0],
-        date=row[1].isoformat(),
-        open_price=row[2],
-        close_price=row[3],
-        high_price=row[4],
-        low_price=row[5],
-        volume=row[6],
-        SMA_10=row[7],
-        SMA_50=row[8],
-        RSI=row[9],
-        MACD=row[10],
-        Signal=row[11],
-        buy_signal=row[12]
-    ) for row in rows]
-    
-    return stocks
+
+    return [
+        SignalResponse(
+            date=row[0].isoformat() if isinstance(row[0], (datetime,)) else row[0],
+            symbol=row[1],
+            horizon=horizon,
+            buy_prob=row[2],
+            buy_signal=row[3]
+        ) for row in rows
+    ]
+
