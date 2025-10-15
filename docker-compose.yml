@@ -122,7 +122,7 @@ services:
       POSTGRES_PASSWORD: Lefevre102!
       POSTGRES_HOST: postgres
     ports:
-      - "8000:8000"
+      - "8001:8000"
     env_file: .env
     depends_on:
       - postgres
