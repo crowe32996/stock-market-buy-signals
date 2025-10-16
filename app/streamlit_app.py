@@ -16,34 +16,36 @@ from utils import (
     HORIZONS,
     COLOR_MAP
 )
+# Paths relative to project root
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # app/ -> project_root
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
+
+SIGNALS_CSV = os.path.join(OUTPUT_DIR, "stock_buy_signals_ML.csv")
+
+# Use CSV by default on Streamlit Cloud / for demo
+USE_CSV = os.getenv("USE_CSV", "1") == "1"  # set to "0" to use Postgres
 
 @st.cache_data(ttl=3600)
 def load_data():
-    conn = psycopg2.connect(
-        dbname=st.secrets["POSTGRES_DB"],
-        user=st.secrets["POSTGRES_USER"],
-        password=st.secrets["POSTGRES_PASSWORD"],
-        host=st.secrets["POSTGRES_HOST"],
-        port=st.secrets.get("POSTGRES_PORT", 5432)
-    )
+    if USE_CSV and os.path.exists(SIGNALS_CSV):
+        # Streamlit Cloud - load from CSV
+        df_all = pd.read_csv(SIGNALS_CSV)
+        df_all['date'] = pd.to_datetime(df_all['date'])
+        df_all = df_all.sort_values(['symbol', 'date']).reset_index(drop=True)
+    else:
+        # Local - point to db
+        from sqlalchemy import create_engine
+        engine = create_engine(
+            f"postgresql+psycopg2://{os.environ['POSTGRES_USER']}:{os.environ['POSTGRES_PASSWORD']}@"
+            f"{os.environ['POSTGRES_HOST']}:{os.environ.get('POSTGRES_PORT', 5432)}/{os.environ['POSTGRES_DB']}"
+        )
+        df_all = pd.read_sql("SELECT * FROM stock_data WHERE symbol!='SPY' ORDER BY date ASC", engine)
+        df_all.columns = df_all.columns.str.strip()
+        df_all['date'] = pd.to_datetime(df_all['date'])
+        df_all = df_all.sort_values(['symbol', 'date']).reset_index(drop=True)
 
-    cols = ['symbol', 'date', 'close_price',
-            'buy_prob_ml_short', 'buy_prob_ml_long']
-
-    df_all = pd.read_sql(
-        f"""
-        SELECT {','.join(cols)}
-        FROM stock_data
-        WHERE symbol != 'SPY'
-          AND EXTRACT(YEAR FROM date) >= 2024
-        """,
-        conn
-    )
-    df_all['date'] = pd.to_datetime(df_all['date'])
-    df_all = df_all.sort_values(['symbol', 'date']).reset_index(drop=True)
-
-    conn.close()
     return df_all
+
 
 @st.cache_data(ttl=3600)
 def get_bucket_summary(df, prob_col, bucket_col, max_days):
