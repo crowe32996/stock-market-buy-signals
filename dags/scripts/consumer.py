@@ -14,7 +14,7 @@ TOPIC = 'stock_data'
 consumer = KafkaConsumer(
     TOPIC,
     bootstrap_servers=[KAFKA_BROKER],
-    group_id='stock_consumer_batch_4',
+    group_id='stock_consumer_batch_11',
     auto_offset_reset='earliest',
     enable_auto_commit=False,
     consumer_timeout_ms=10000,
@@ -39,16 +39,30 @@ conn = psycopg2.connect(
 )
 cursor = conn.cursor()
 
+# Pre-fetch existing keys to avoid inserting duplicates
+print("Fetching existing keys from PostgreSQL...")
+cursor.execute("SELECT symbol, date FROM stock_data")
+existing_keys = set(cursor.fetchall())
+print(f"Loaded {len(existing_keys)} existing keys")
+
 BATCH_SIZE = 5000
 batch = []
 
 def store_stock_data_batch(record):
     try:
         timestamp = datetime.strptime(record['date'], '%Y-%m-%d')
+        key = (record['symbol'], timestamp)
+
+        # Skip if already in DB
+        if key in existing_keys:
+            return False
+
+        # Add to batch and mark as seen
         batch.append((
             record['symbol'], record['open_price'], record['close_price'],
             record['high_price'], record['low_price'], record['volume'], timestamp
         ))
+        existing_keys.add(key)
 
         # Insert batch if full
         if len(batch) >= BATCH_SIZE:
@@ -65,10 +79,9 @@ def insert_batch(batch_to_insert):
         cursor.executemany("""
             INSERT INTO stock_data (symbol, open_price, close_price, high_price, low_price, volume, date)
             VALUES (%s,%s,%s,%s,%s,%s,%s)
-            ON CONFLICT (symbol, date) DO NOTHING
         """, batch_to_insert)
         conn.commit()
-        print(f"Inserted batch of {len(batch_to_insert)} records")
+        print(f"Inserted batch of {len(batch_to_insert)} new records")
     except Exception as e:
         print(f"Error inserting batch: {e}")
         conn.rollback()
@@ -81,7 +94,7 @@ if __name__ == "__main__":
             store_stock_data_batch(record)
             messages_consumed += 1
 
-        # Insert remaining records
+        # Insert any remaining records
         if batch:
             insert_batch(batch)
 

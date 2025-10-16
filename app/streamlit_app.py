@@ -3,56 +3,53 @@ import pandas as pd
 import numpy as np
 import os
 from sqlalchemy import create_engine
+import psycopg2
 from utils import (
     bucket_probabilities_quantile,
     add_logo_html,
     render_logo_table,
     plot_bucket_curves_plotly,
-    compute_spy_forward_returns,
     compute_forward_returns,
     summarize_buckets,
+    trim_to_common_dates,
     HORIZONS,
     COLOR_MAP
 )
 
-# Paths relative to project root
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # app/ -> project_root
-OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
-
-SIGNALS_CSV = os.path.join(OUTPUT_DIR, "stock_buy_signals_ML.csv")
-SPY_CSV = os.path.join(OUTPUT_DIR, "SPY_data.csv")
-
-USE_CSV = os.getenv("USE_CSV", "1") == "1"  # set to "0" to use Postgres
-
 @st.cache_data(ttl=3600)
 def load_data():
-    if USE_CSV and os.path.exists(SIGNALS_CSV) and os.path.exists(SPY_CSV):
-        # Load from CSV
-        df_all = pd.read_csv(SIGNALS_CSV)
-        df_all['date'] = pd.to_datetime(df_all['date'])
-        
-        spy_df = pd.read_csv(SPY_CSV)
-        spy_df['date'] = pd.to_datetime(spy_df['date'])
-    else:
-        # Load from Postgres, for once deployed to EC2
-        from sqlalchemy import create_engine
-        engine = create_engine(
-            f"postgresql+psycopg2://{os.environ['POSTGRES_USER']}:{os.environ['POSTGRES_PASSWORD']}@"
-            f"{os.environ['POSTGRES_HOST']}:{os.environ.get('POSTGRES_PORT', 5432)}/{os.environ['POSTGRES_DB']}"
-        )
-        df_all = pd.read_sql("SELECT * FROM stock_data WHERE symbol!='SPY' ORDER BY date ASC", engine)
-        df_all.columns = df_all.columns.str.strip()
-        df_all['date'] = pd.to_datetime(df_all['date'])
-        
-        spy_df = pd.read_sql("SELECT date, close_price FROM stock_data WHERE symbol='SPY' ORDER BY date ASC", engine)
-        spy_df['date'] = pd.to_datetime(spy_df['date'])
-    
-    return df_all, spy_df
+    conn = psycopg2.connect(
+        dbname=os.environ['POSTGRES_DB'],
+        user=os.environ['POSTGRES_USER'],
+        password=os.environ['POSTGRES_PASSWORD'],
+        host=os.environ['POSTGRES_HOST'],
+        port=os.environ.get('POSTGRES_PORT', 5432)
+    )
+
+    cols = ['symbol', 'date', 'close_price',
+            'buy_prob_ml_short', 'buy_prob_ml_long']
+
+    # Load only 2024 and 2025
+    df_all = pd.read_sql(
+        f"""
+        SELECT {','.join(cols)}
+        FROM stock_data
+        WHERE symbol != 'SPY'
+          AND EXTRACT(YEAR FROM date) >= 2024
+        """,
+        conn
+    )
+    df_all['date'] = pd.to_datetime(df_all['date'])
+    df_all = df_all.sort_values(['symbol', 'date']).reset_index(drop=True)
+
+    conn.close()
+    return df_all
 
 @st.cache_data(ttl=3600)
 def get_bucket_summary(df, prob_col, bucket_col, max_days):
     df = bucket_probabilities_quantile(df.copy(), prob_col, bucket_col)
     df = compute_forward_returns(df, max_days)
+    df = trim_to_common_dates(df, max_days)
     summary = summarize_buckets(df, bucket_col, max_days)
     return summary
 
@@ -61,54 +58,76 @@ def get_summary_for_tab(df, horizon_key, signal_col, bucket_col, max_days, selec
         return precomputed_summaries[horizon_key]
     else:
         df_filtered = df.copy()
-        if 'date' in df.columns and horizon_key == '2023':
-            df_filtered = df_filtered[df_filtered['date'].dt.year == 2023]
         df_filtered = df_filtered[df_filtered['symbol'] == selected_symbol]
         return get_bucket_summary(df_filtered, signal_col, bucket_col, max_days)
 
-df_all, spy_df = load_data()
+def compute_aligned_baseline(df_all, bucket_col, max_days):
+    """
+    Compute baseline forward returns and win rate aligned to the symbols and dates
+    used in the bucketed signal summaries.
+    """
+    df_bucketed = df_all.dropna(subset=[bucket_col]).copy()
 
-for horizon_name in ['short', 'medium', 'long']:
+    for day in range(1, max_days + 1):
+        df_bucketed[f'fr_{day}'] = df_bucketed.groupby('symbol')['close_price'].shift(-day) / df_bucketed['close_price'] - 1
+
+    forward_cols = [f'fr_{d}' for d in range(1, max_days + 1)]
+    melted = df_bucketed.melt(
+        id_vars=['symbol','date'],
+        value_vars=forward_cols,
+        var_name='days',
+        value_name='forward_return'
+    )
+    melted['days'] = melted['days'].str.replace('fr_','').astype(int)
+    melted = melted.dropna(subset=['forward_return'])
+
+    baseline_avg = (
+        melted.groupby('days')['forward_return']
+        .mean()
+        .reset_index()
+        .rename(columns={'forward_return':'avg_return'})
+    )
+
+    baseline_winrate = (
+        melted.assign(is_win = melted['forward_return'] > 0)
+        .groupby('days')['is_win']
+        .mean()
+        .reset_index()
+        .rename(columns={'is_win':'win_rate'})
+    )
+
+    return baseline_avg, baseline_winrate
+
+df_all = load_data()
+
+for horizon_name in ['short', 'long']:
     prob_col = f"buy_prob_ml_{horizon_name}"
     bucket_col = f'signal_bucket_{horizon_name}'
-    df_all = bucket_probabilities_quantile(df_all, prob_col, bucket_col)  # assign directly
-
-# Precompute SPY forward returns
-spy_summary = compute_spy_forward_returns(spy_df, max_days=150)
-spy_summary_2023 = compute_spy_forward_returns(spy_df[spy_df['date'].dt.year == 2023], max_days=150)
+    df_all = bucket_probabilities_quantile(df_all, prob_col, bucket_col)
 
 # -----------------------------
 # Compute buckets and summaries
 # -----------------------------
 bucket_summaries = {}
-bucket_summaries_2023 = {}
 
 for horizon_name, params in HORIZONS.items():
     prob_col = params['prob_col']
     max_days = params['max_days']
     bucket_col = f'signal_bucket_{horizon_name}'
-
-    # 2024-current
     bucket_summaries[horizon_name] = get_bucket_summary(df_all, prob_col, bucket_col, max_days)
-
-    # 2023 historical
-    df_2023 = df_all[df_all['date'].dt.year == 2023].copy()
-    bucket_summaries_2023[horizon_name] = get_bucket_summary(df_2023, prob_col, bucket_col, max_days)
 
 # -----------------------------
 # Streamlit setup
 # -----------------------------
 st.set_page_config(page_title="Stock Buy Signal Analysis", layout="wide")
 
-# Sidebar filters
 symbol_options = sorted(df_all['symbol'].unique())
 symbol_options.insert(0, "All")
 selected_symbol = st.sidebar.selectbox("Select Symbol", symbol_options, index=0)
 
-horizon = st.sidebar.radio("Select Horizon", ["Short", "Medium", "Long"])
+horizon = st.sidebar.radio("Select Horizon", ["Short", "Long"], index=1)
 horizon_map = {
     "Short": {"prob_col": "buy_prob_ml_short", "max_days": 10},
-    "Medium": {"prob_col": "buy_prob_ml_medium", "max_days": 100},
     "Long": {"prob_col": "buy_prob_ml_long", "max_days": 150}
 }
 selected_horizon = horizon_map[horizon]
@@ -117,11 +136,20 @@ horizon_key = horizon.lower()
 bucket_col = f'signal_bucket_{horizon_key}'
 max_days = selected_horizon['max_days']
 
+# Compute baseline forward returns
+df_filtered_for_baseline = df_all.dropna(subset=[bucket_col]).copy()
+baseline_summary_aligned, baseline_winrate_aligned = compute_aligned_baseline(
+    df_filtered_for_baseline,
+    bucket_col=bucket_col,
+    max_days=max_days
+)
+
 # Filter dataframe for selected symbol
 if selected_symbol != "All":
     df_filtered = df_all[df_all['symbol'] == selected_symbol].copy()
 else:
     df_filtered = df_all.copy()
+
 latest_date = df_filtered['date'].max()
 selected_date = st.sidebar.date_input(
     "Select Date",
@@ -138,11 +166,11 @@ df_filtered['Date'] = df_filtered['date'].dt.strftime("%m/%d/%Y")
 st.title("📈 Stock Buy Signal Analysis")
 st.markdown(
     "Evaluating the performance of buy signals determined by Random Forest models "
-    "across short, medium, and long horizons."
+    "across short and long horizons."
 )
 
-tab_recommend, tab_overall, tab_2023, tab_methodology = st.tabs(
-    ["Stock Recommendations", "Signal Performance (2024-current)", "2023 Historical Data", "Methodology"]
+tab_recommend, tab_overall, tab_methodology = st.tabs(
+    ["Stock Recommendations", "Signal Performance (2024-current)", "Methodology"]
 )
 
 # --- Tab 1: Daily Stock Signals ---
@@ -180,8 +208,6 @@ with tab_recommend:
 # --- Tab 2: Signal Performance (2024-current) ---
 with tab_overall:
     st.subheader(f"Signal Performance 2024-current ({horizon} Horizon)")
-    # Filter for selected symbol (or keep all)
-    # Use precomputed summaries
     summary_df_filtered = get_summary_for_tab(
         df_all,
         horizon_key,
@@ -197,55 +223,20 @@ with tab_overall:
         bucket_col=bucket_col,
         title="Average Return by Signal",
         y_col='avg_return',
-        y_label="Average Return",
-        spy_summary=spy_summary,
-        color_map= COLOR_MAP
+        spy_summary=baseline_summary_aligned  ,  # removed spy
+        color_map=COLOR_MAP
     )
+
     fig_winrate = plot_bucket_curves_plotly(
         summary_df_filtered,
         bucket_col=bucket_col,
         title="Win Rate by Signal",
         y_col='win_rate',
-        y_label="Win Rate",
-        spy_summary=spy_summary,
-        color_map= COLOR_MAP
+        spy_summary=baseline_winrate_aligned  ,  # removed spy
+        color_map=COLOR_MAP
     )
     st.plotly_chart(fig_avg_return, use_container_width=True)
     st.plotly_chart(fig_winrate, use_container_width=True)
-
-# --- Tab 3: 2023 Historical ---
-with tab_2023:
-    st.subheader(f"2023 Historical Data ({horizon} Horizon)")
-    summary_df_2023_filtered = get_summary_for_tab(
-        df_all,
-        horizon_key,
-        signal_col,
-        bucket_col,
-        max_days,
-        selected_symbol,
-        bucket_summaries_2023
-    )
-
-    fig_avg_return_2023 = plot_bucket_curves_plotly(
-        summary_df_2023_filtered,
-        bucket_col=bucket_col,
-        title="Average Return by Signal (2023)",
-        y_col='avg_return',
-        y_label="Average Return",
-        spy_summary=spy_summary_2023,
-        color_map= COLOR_MAP
-    )
-    fig_winrate_2023 = plot_bucket_curves_plotly(
-        summary_df_2023_filtered,
-        bucket_col=bucket_col,
-        title="Win Rate by Signal (2023)",
-        y_col='win_rate',
-        y_label="Win Rate",
-        spy_summary=spy_summary_2023,
-        color_map= COLOR_MAP
-    )
-    st.plotly_chart(fig_avg_return_2023, use_container_width=True)
-    st.plotly_chart(fig_winrate_2023, use_container_width=True)
 
 with tab_methodology:
     st.title("Methodology")
@@ -256,7 +247,7 @@ with tab_methodology:
 
     - A **Random Forest** is an ensemble of decision trees, each trained on random subsets of features and data.
     - Each tree outputs a prediction (buy / not buy), and the final prediction is the **majority vote** of all trees.
-    - By training separate models for short, medium, and long horizons, we create different trading strategies for different timeframes.
+    - By training separate models for short and long horizons, we create different trading strategies for different timeframes.
     - The model outputs a **probability of a buy signal**, which is then bucketed into `buy`, `hold`, or `sell` categories.
 
     **Advantages:**
@@ -267,10 +258,10 @@ with tab_methodology:
     
     st.subheader("Feature Inputs in Random Forest Model")
     st.markdown("""
-    Determining the confidence of a buy signal required a combination of **technical indicators**, **price/volume metrics**, and **momentum/volatility indicators** to predict short-term, medium-term, and long-term stock movements. The features calculated separately with different timelines for each horizon:
+    Determining the confidence of a buy signal required a combination of **technical indicators**, **price/volume metrics**, and **momentum/volatility indicators** to predict short-term and long-term stock movements. The features calculated separately with different timelines for each horizon:
 
     - **Price & Volume**: the stock's close price and number of trades
-    - **Simple Moving Averages (SMA)**: measures average price over different periods to identify trends. Short-term SMAs (3,5,10) capture recent trends, medium (10,20,50) capture mid-term trends, and long-term (20,50,100) capture broader trends.
+    - **Simple Moving Averages (SMA)**: measures average price over different periods to identify trends. Short-term SMAs (3,5,10) capture recent trends and long-term (20,50,100) capture broader trends.
     - **Exponential Moving Averages (EMA)**: similar to SMA but gives more weight to recent prices.
     - **MACD (Moving Average Convergence Divergence) & Signal Line**: difference between fast and slow EMAs, used to measure momentum.
     - **RSI (Relative Strength Index)**: momentum indicator measured from 0–100. Values less than 30 indicate oversold, and values over 70 indicate overbought. 

@@ -141,7 +141,7 @@ SYMBOL_TO_DOMAIN = {
 
 HORIZONS = {
     'short': {'prob_col': 'buy_prob_ml_short', 'max_days': 10},
-    'medium': {'prob_col': 'buy_prob_ml_medium', 'max_days': 100},
+    # 'medium': {'prob_col': 'buy_prob_ml_medium', 'max_days': 100},
     'long': {'prob_col': 'buy_prob_ml_long', 'max_days': 150}
 }
 
@@ -211,8 +211,10 @@ def compute_spy_forward_returns(spy_df, max_days):
     spy_returns = []
     for h in range(1, max_days + 1):
         spy_df[f'spy_return_{h}'] = spy_df['close_price'].pct_change(periods=h).shift(-h)
-        avg_return = spy_df[f'spy_return_{h}'].mean()
-        win_rate = (spy_df[f'spy_return_{h}'] > 0).mean()  # <= here is 0/1 for negative returns
+        # Only consider rows with valid returns
+        valid_returns = spy_df[f'spy_return_{h}'].dropna()
+        avg_return = valid_returns.mean()
+        win_rate = (valid_returns > 0).mean()
         spy_returns.append({'days': h, 'avg_return': avg_return, 'win_rate': win_rate})
     return pd.DataFrame(spy_returns)
 
@@ -278,7 +280,7 @@ def plot_bucket_curves_plotly(summary_df, bucket_col, title, y_col, y_label=None
             x=spy_plot['days'],
             y=spy_plot[y_col] * 100,
             mode='lines',
-            name='SPY',
+            name='Baseline',
             line=dict(color='black', dash='dash', width=2)
         ))
 
@@ -291,3 +293,8 @@ def plot_bucket_curves_plotly(summary_df, bucket_col, title, y_col, y_label=None
     )
 
     return fig
+
+def trim_to_common_dates(df, max_days):
+    """Remove last `max_days` days per symbol so all forward returns are fully computable."""
+    df = df.sort_values(['symbol', 'date'])
+    return df.groupby('symbol').apply(lambda g: g.iloc[:-max_days]).reset_index(drop=True)

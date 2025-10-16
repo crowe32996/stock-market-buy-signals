@@ -27,7 +27,7 @@ A **Random Forest classifier** is used to predict whether a stock will generate 
 
 - A **Random Forest** is an ensemble of decision trees, each trained on random subsets of features and data.  
 - Each tree outputs a prediction (buy / not buy), and the final prediction is the **majority vote** of all trees.  
-- Separate models are trained for **short, medium, and long horizons** to create different trading strategies.  
+- Separate models are trained for **short and long horizons** to create different trading strategies.  
 - The model outputs a **probability of a buy signal**, which is then bucketed into buy, hold, or sell categories.
 
 **Advantages:**
@@ -39,7 +39,7 @@ A **Random Forest classifier** is used to predict whether a stock will generate 
 The Random Forest model uses a combination of **technical indicators**, **price/volume metrics**, and **momentum/volatility indicators**, calculated separately for each horizon:
 
 - **Price & Volume**: closing price and number of trades.  
-- **Simple Moving Averages (SMA)**: short-term (3,5,10), medium (10,20,50), long-term (20,50,100) to capture trends over different horizons.  
+- **Simple Moving Averages (SMA)**: short-term (3,5,10) and long-term (20,50,100) to capture trends over different horizons.  
 - **Exponential Moving Averages (EMA)**: similar to SMA but weights recent prices more heavily.  
 - **MACD & Signal Line**: measures momentum from the difference between fast and slow EMAs.  
 - **RSI (Relative Strength Index)**: momentum indicator ranging from 0–100; <30 is oversold, >70 is overbought.  
@@ -55,7 +55,45 @@ Probabilities from the Random Forest classifier are bucketed as:
 ### Model Effectiveness
 - The model's signals are evaluated over time and plotted in the **Signal Performance** tab.  
 - The evaluation uses **out-of-sample data** to ensure results are not biased by training data.  
-- Historical data (e.g., 2021–2023) may show higher returns due to overfitting, so focus on the out-of-sample evaluation for realistic performance.
+- Long-term signals show better average returns and win rates than the baseline average, while short-term signals are noisy and unreliable in terms of meaningful signals. 
+
+## API Access and Documentation
+
+Access daily ML stock signals and historical indicators via API endpoints. Additional endpoints for model performance and technical indicators coming soon.
+
+- **Swagger UI:** [https://api.crowedata.com/docs/](https://api.crowedata.com/docs/)
+
+**Data Endpoint:**
+
+| Endpoint   | Method | Description |
+|------------|--------|-------------|
+| `/signals` | GET    | Returns daily “Buy/Hold/Sell” signals for all stocks or a specific symbol |
+
+**Parameters:**
+
+| Parameter | Type           | Description                          | Required | Example |
+|-----------|----------------|--------------------------------------|---------|---------|
+| `date`    | string (YYYY-MM-DD) | The date for which to get signals | ✅       | 2025-10-14 |
+| `horizon` | string         | short / long                          | ✅       | long    |
+| `symbol`  | string         | Optional stock symbol                 | ❌       | MSFT    |
+
+**Example Request:**
+
+GET https://api.crowedata.com/signals?date=2025-10-14&horizon=short&symbol=MSFT
+
+**Example Response:**
+
+```json
+[
+  {
+    "date": "2025-10-14T00:00:00",
+    "symbol": "MSFT",
+    "horizon": "short",
+    "buy_prob": 0.4993219753635199,
+    "buy_signal": false
+  }
+]
+```
 
 ⚠️ **Disclaimer**  
 The information presented is for **educational and informational purposes only** and **does not constitute financial, investment, or trading advice**. Past performance does not guarantee future results.
@@ -194,6 +232,7 @@ MIT License © Charlie Rowe
 ## Contact
 Questions? Email: cwr321@gmail.com
 GitHub: crowe32996
+Website: crowedata.com/stock-market
 
 
 

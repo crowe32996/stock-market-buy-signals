@@ -8,6 +8,9 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from dotenv import load_dotenv
+from tqdm import tqdm
+import time
+
 
 # -----------------------------
 # Config
@@ -76,6 +79,7 @@ cursor = conn.cursor()
 
 def compute_indicators(df):
     df = df.sort_values("date").copy()
+    start = time.time()
 
     # -----------------------------
     # Moving averages (common)
@@ -136,6 +140,9 @@ def compute_indicators(df):
     df['score'] = df[['uptrend','vol_confirm']].astype(int).sum(axis=1)
     df['buy_signal'] = df['score'] >= 2
 
+    elapsed = time.time() - start
+    print(f"  compute_indicators done in {elapsed:.2f}s")
+
     return df
 
 def train_ml(df, horizon_days, spy_df, horizon_name, 
@@ -144,6 +151,8 @@ def train_ml(df, horizon_days, spy_df, horizon_name,
     """
     Train RF on 2024–2025 data and backtest on 2023, but predict ML probabilities for all years.
     """
+    start = time.time()
+
     # Remove duplicate SPY columns
     df = df.drop(columns=[col for col in df.columns if 'spy_close' in col], errors='ignore')
 
@@ -188,6 +197,8 @@ def train_ml(df, horizon_days, spy_df, horizon_name,
     if not predict_df.empty:
         X_pred = predict_df[features]
         df.loc[predict_df.index, f'buy_prob_ml_{horizon_name}'] = rf.predict_proba(X_pred)[:, 1]
+    elapsed = time.time() - start
+    print(f"  train_ml for {horizon_name} done in {elapsed:.2f}s")
 
     return df, rf
 
@@ -222,7 +233,7 @@ def main(symbols, train_start='2021-01-01', train_end='2023-12-31', eval_start='
     spy_df = pd.DataFrame(spy_rows, columns=['date','close_price'])
     spy_df['date'] = pd.to_datetime(spy_df['date'])
     
-    for symbol in symbols:
+    for symbol in tqdm(symbols, desc="Processing symbols"):
         cursor.execute("SELECT * FROM stock_data WHERE symbol=%s ORDER BY date ASC", (symbol,))
         rows = cursor.fetchall()
         if not rows:
@@ -249,7 +260,7 @@ def main(symbols, train_start='2021-01-01', train_end='2023-12-31', eval_start='
     
     eval_results = []
     rf_models = {}  # store trained models if needed
-    for name in HORIZONS:
+    for name in tqdm(HORIZONS, desc="Training ML horizons"):
         df_all, rf_model = train_ml(
             df_all,
             HORIZONS[name],
@@ -273,51 +284,92 @@ def main(symbols, train_start='2021-01-01', train_end='2023-12-31', eval_start='
 
 def add_threshold_signals_and_forward_returns(df, threshold=0.75, max_days=150):
     """
-    Compute forward returns 1..max_days and generate binary buy signals
+    Efficiently compute forward returns 1..max_days and generate binary buy signals
     based on ML probabilities for each horizon.
     """
-    # Compute forward returns for 1..max_days
-    for horizon in range(1, max_days + 1):
-        df[f'forward_return_{horizon}'] = df['close_price'].pct_change(horizon).shift(-horizon)
+    n_rows = len(df)
+    
+    # Vectorized forward returns: create a 2D array of shape (n_rows, max_days)
+    close_prices = df['close_price'].values
 
-    # Compute binary buy signals for each ML horizon
-    for ml_horizon in HORIZONS:
+    # Actually we need shift(-horizon) for each horizon
+    forward_returns = np.zeros((n_rows, max_days), dtype=float)
+    for h in tqdm(range(1, max_days + 1), desc="Forward returns"):
+        shifted = np.roll(close_prices, -h)
+        shifted[-h:] = np.nan
+        forward_returns[:, h-1] = (shifted / close_prices) - 1
+
+    # Assign all columns at once
+    forward_return_cols = [f'forward_return_{h}' for h in range(1, max_days + 1)]
+    df_forward = pd.DataFrame(forward_returns, columns=forward_return_cols, index=df.index)
+    df = pd.concat([df, df_forward], axis=1)
+
+    # Threshold-based ML signals
+    for ml_horizon in tqdm(HORIZONS, desc="Threshold signals"):
         prob_col = f'buy_prob_ml_{ml_horizon}'
         signal_col = f'buy_ml_{ml_horizon}'
         df[signal_col] = df[prob_col] >= threshold
 
     return df
 
-def update_stock_data(df, cursor, conn):
+def update_stock_data(df, cursor, conn, batch_size=5000):
+    """
+    Update stock_data table with ML probabilities and signals.
+    Only updates rows where ml_processed is False.
+    Commits in batches to avoid overwhelming the DB.
+    """
+    # Filter only rows that need updating
+    df_to_update = df[df['ml_processed'] == False].copy()
+
+    if df_to_update.empty:
+        print("✅ No rows need updating (ml_processed=False). Exiting early.")
+        return
+
     update_sql = """
-        UPDATE stock_data
-        SET
-            buy_prob_ml_short = %s,
-            buy_prob_ml_medium = %s,
-            buy_prob_ml_long = %s,
-            buy_ml_short = %s,
-            buy_ml_medium = %s,
-            buy_ml_long = %s
-        WHERE symbol = %s AND date = %s
+    UPDATE stock_data
+    SET
+        buy_prob_ml_short = %s,
+        buy_prob_ml_medium = %s,
+        buy_prob_ml_long = %s,
+        buy_ml_short = %s,
+        buy_ml_medium = %s,
+        buy_ml_long = %s,
+        ml_processed = TRUE
+    WHERE symbol = %s AND date = %s
+    AND ml_processed = FALSE
     """
 
-    # Convert DataFrame rows to list of tuples
-    data_to_update = [
-        (
-            row['buy_prob_ml_short'],
-            row['buy_prob_ml_medium'],
-            row['buy_prob_ml_long'],
-            row['buy_ml_short'],
-            row['buy_ml_medium'],
-            row['buy_ml_long'],
-            row['symbol'],
-            row['date']
-        )
-        for _, row in df.iterrows()
-    ]
+    n_rows = len(df_to_update)
+    print(f"Updating {n_rows} rows in batches of {batch_size}...")
 
-    cursor.executemany(update_sql, data_to_update)
-    conn.commit()
+    for start in tqdm(range(0, n_rows, batch_size), desc="Updating DB in batches"):
+        batch = df_to_update.iloc[start:start+batch_size]
+
+        # Drop rows with NaN in ML probabilities
+        batch = batch.dropna(subset=[
+            'buy_prob_ml_short', 'buy_prob_ml_medium', 'buy_prob_ml_long'
+        ])
+
+        if batch.empty:
+            continue
+
+        data_to_update = [
+            (
+                row['buy_prob_ml_short'],
+                row['buy_prob_ml_medium'],
+                row['buy_prob_ml_long'],
+                row['buy_ml_short'],
+                row['buy_ml_medium'],
+                row['buy_ml_long'],
+                row['symbol'],
+                row['date']
+            )
+            for _, row in batch.iterrows()
+        ]
+
+        cursor.executemany(update_sql, data_to_update)
+        conn.commit()
+
 
 
 if __name__ == "__main__":
