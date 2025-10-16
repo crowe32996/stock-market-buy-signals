@@ -16,14 +16,10 @@ from utils import (
     HORIZONS,
     COLOR_MAP
 )
-# Paths relative to project root
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # app/ -> project_root
-OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
-
+# Path to project output folder
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))  # app/ folder
+OUTPUT_DIR = os.path.abspath(os.path.join(PROJECT_ROOT, "..", "output"))  # project_root/output
 SIGNALS_CSV = os.path.join(OUTPUT_DIR, "stock_buy_signals_ML.csv")
-
-# Use CSV by default on Streamlit Cloud / for demo
-USE_CSV = os.getenv("USE_CSV", "1") == "1"  # set to "0" to use Postgres
 
 @st.cache_data(ttl=3600)
 def load_data():
