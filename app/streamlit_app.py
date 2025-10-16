@@ -4,6 +4,9 @@ import numpy as np
 import os
 from sqlalchemy import create_engine
 import psycopg2
+from dotenv import load_dotenv
+import os
+from pathlib import Path
 from utils import (
     bucket_probabilities_quantile,
     add_logo_html,
@@ -15,6 +18,10 @@ from utils import (
     HORIZONS,
     COLOR_MAP
 )
+
+# repo root path
+env_path = Path(__file__).resolve().parents[1] / '.env'
+load_dotenv(dotenv_path=env_path)
 
 @st.cache_data(ttl=3600)
 def load_data():
