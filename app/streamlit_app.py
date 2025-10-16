@@ -4,7 +4,7 @@ import numpy as np
 import os
 from sqlalchemy import create_engine
 import psycopg2
-from dotenv import load_dotenv
+#from dotenv import load_dotenv
 from utils import (
     bucket_probabilities_quantile,
     add_logo_html,
@@ -17,7 +17,7 @@ from utils import (
     COLOR_MAP
 )
 # Path to project output folder
-SIGNALS_CSV = os.path.join(os.path.dirname(os.path.dirname(__file__)), "output", "stock_buy_signals_ML.csv")
+SIGNALS_CSV = os.path.join(os.path.dirname(__file__), "stock_buy_signals_ML.csv")
 
 @st.cache_data(ttl=3600)
 def load_data():
