@@ -4,7 +4,6 @@ import numpy as np
 import os
 from sqlalchemy import create_engine
 import psycopg2
-#from dotenv import load_dotenv
 from utils import (
     bucket_probabilities_quantile,
     add_logo_html,
@@ -16,19 +15,47 @@ from utils import (
     HORIZONS,
     COLOR_MAP
 )
+
 # Path to project output folder
 SIGNALS_CSV = os.path.join(os.path.dirname(__file__), "stock_buy_signals_ML.csv")
+
+st.write("📂 Current working directory:", os.getcwd())
+st.write("📄 Script directory:", os.path.dirname(__file__))
+st.write("📊 Expected CSV path:", SIGNALS_CSV)
+st.write("🟢 File exists?", os.path.exists(SIGNALS_CSV))
 
 @st.cache_data(ttl=3600)
 def load_data():
     try:
+        # Step 1: Try reading just the first few rows for quick feedback
+        preview = pd.read_csv(SIGNALS_CSV, nrows=5)
+        st.write("✅ Preview of CSV (first 5 rows):")
+        st.dataframe(preview)
+
+        # Step 2: Load full dataset
         df_all = pd.read_csv(SIGNALS_CSV)
-        df_all['date'] = pd.to_datetime(df_all['date'])
+        st.write("✅ Full CSV loaded successfully with shape:", df_all.shape)
+
+        # Step 3: Check for missing / unexpected columns
+        expected_cols = ['symbol', 'date']
+        missing = [col for col in expected_cols if col not in df_all.columns]
+        if missing:
+            st.warning(f"⚠️ Missing expected columns: {missing}")
+
+        # Step 4: Try parsing date and sorting
+        if 'date' in df_all.columns:
+            df_all['date'] = pd.to_datetime(df_all['date'], errors='coerce')
+            if df_all['date'].isna().any():
+                st.warning("⚠️ Some 'date' values could not be parsed and were set to NaT")
+
         df_all = df_all.sort_values(['symbol', 'date']).reset_index(drop=True)
         return df_all
+
     except Exception as e:
-        st.error(f"Failed to load CSV: {e}")
-        return pd.DataFrame()  # fallback so app doesn't crash
+        import traceback
+        st.error("❌ Failed to load CSV.")
+        st.code(traceback.format_exc())  # full traceback for debugging
+        return pd.DataFrame()
 
 @st.cache_data(ttl=3600)
 def get_bucket_summary(df, prob_col, bucket_col, max_days):
