@@ -4,7 +4,7 @@ import numpy as np
 import os
 from sqlalchemy import create_engine
 import psycopg2
-from .utils import (
+from app.utils import (
     bucket_probabilities_quantile,
     add_logo_html,
     render_logo_table,
