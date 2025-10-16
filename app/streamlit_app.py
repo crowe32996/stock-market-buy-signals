@@ -27,23 +27,10 @@ USE_CSV = os.getenv("USE_CSV", "1") == "1"  # set to "0" to use Postgres
 
 @st.cache_data(ttl=3600)
 def load_data():
-    if USE_CSV and os.path.exists(SIGNALS_CSV):
-        # Streamlit Cloud - load from CSV
-        df_all = pd.read_csv(SIGNALS_CSV)
-        df_all['date'] = pd.to_datetime(df_all['date'])
-        df_all = df_all.sort_values(['symbol', 'date']).reset_index(drop=True)
-    else:
-        # Local - point to db
-        from sqlalchemy import create_engine
-        engine = create_engine(
-            f"postgresql+psycopg2://{os.environ['POSTGRES_USER']}:{os.environ['POSTGRES_PASSWORD']}@"
-            f"{os.environ['POSTGRES_HOST']}:{os.environ.get('POSTGRES_PORT', 5432)}/{os.environ['POSTGRES_DB']}"
-        )
-        df_all = pd.read_sql("SELECT * FROM stock_data WHERE symbol!='SPY' ORDER BY date ASC", engine)
-        df_all.columns = df_all.columns.str.strip()
-        df_all['date'] = pd.to_datetime(df_all['date'])
-        df_all = df_all.sort_values(['symbol', 'date']).reset_index(drop=True)
-
+    # Streamlit Cloud - load from CSV
+    df_all = pd.read_csv(SIGNALS_CSV)
+    df_all['date'] = pd.to_datetime(df_all['date'])
+    df_all = df_all.sort_values(['symbol', 'date']).reset_index(drop=True)
     return df_all
 
 
