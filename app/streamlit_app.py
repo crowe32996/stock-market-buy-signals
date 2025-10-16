@@ -17,9 +17,7 @@ from utils import (
     COLOR_MAP
 )
 # Path to project output folder
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))  # app/ folder
-OUTPUT_DIR = os.path.abspath(os.path.join(PROJECT_ROOT, "output"))  # project_root/output
-SIGNALS_CSV = os.path.join(OUTPUT_DIR, "stock_buy_signals_ML.csv")
+SIGNALS_CSV = os.path.join(os.path.dirname(os.path.dirname(__file__)), "output", "stock_buy_signals_ML.csv")
 
 @st.cache_data(ttl=3600)
 def load_data():
@@ -31,8 +29,6 @@ def load_data():
     except Exception as e:
         st.error(f"Failed to load CSV: {e}")
         return pd.DataFrame()  # fallback so app doesn't crash
-
-
 
 @st.cache_data(ttl=3600)
 def get_bucket_summary(df, prob_col, bucket_col, max_days):
