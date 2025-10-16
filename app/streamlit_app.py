@@ -18,7 +18,7 @@ from utils import (
 )
 # Path to project output folder
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))  # app/ folder
-OUTPUT_DIR = os.path.abspath(os.path.join(PROJECT_ROOT, "..", "output"))  # project_root/output
+OUTPUT_DIR = os.path.abspath(os.path.join(PROJECT_ROOT, "output"))  # project_root/output
 SIGNALS_CSV = os.path.join(OUTPUT_DIR, "stock_buy_signals_ML.csv")
 
 @st.cache_data(ttl=3600)
