@@ -23,11 +23,15 @@ SIGNALS_CSV = os.path.join(OUTPUT_DIR, "stock_buy_signals_ML.csv")
 
 @st.cache_data(ttl=3600)
 def load_data():
-    # Streamlit Cloud - load from CSV
-    df_all = pd.read_csv(SIGNALS_CSV)
-    df_all['date'] = pd.to_datetime(df_all['date'])
-    df_all = df_all.sort_values(['symbol', 'date']).reset_index(drop=True)
-    return df_all
+    try:
+        df_all = pd.read_csv(SIGNALS_CSV)
+        df_all['date'] = pd.to_datetime(df_all['date'])
+        df_all = df_all.sort_values(['symbol', 'date']).reset_index(drop=True)
+        return df_all
+    except Exception as e:
+        st.error(f"Failed to load CSV: {e}")
+        return pd.DataFrame()  # fallback so app doesn't crash
+
 
 
 @st.cache_data(ttl=3600)
