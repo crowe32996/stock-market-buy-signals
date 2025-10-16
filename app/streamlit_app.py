@@ -5,8 +5,6 @@ import os
 from sqlalchemy import create_engine
 import psycopg2
 from dotenv import load_dotenv
-import os
-from pathlib import Path
 from utils import (
     bucket_probabilities_quantile,
     add_logo_html,
@@ -19,24 +17,19 @@ from utils import (
     COLOR_MAP
 )
 
-# repo root path
-env_path = Path(__file__).resolve().parents[1] / '.env'
-load_dotenv(dotenv_path=env_path)
-
 @st.cache_data(ttl=3600)
 def load_data():
     conn = psycopg2.connect(
-        dbname=os.environ['POSTGRES_DB'],
-        user=os.environ['POSTGRES_USER'],
-        password=os.environ['POSTGRES_PASSWORD'],
-        host=os.environ['POSTGRES_HOST'],
-        port=os.environ.get('POSTGRES_PORT', 5432)
+        dbname=st.secrets["POSTGRES_DB"],
+        user=st.secrets["POSTGRES_USER"],
+        password=st.secrets["POSTGRES_PASSWORD"],
+        host=st.secrets["POSTGRES_HOST"],
+        port=st.secrets.get("POSTGRES_PORT", 5432)
     )
 
     cols = ['symbol', 'date', 'close_price',
             'buy_prob_ml_short', 'buy_prob_ml_long']
 
-    # Load only 2024 and 2025
     df_all = pd.read_sql(
         f"""
         SELECT {','.join(cols)}
