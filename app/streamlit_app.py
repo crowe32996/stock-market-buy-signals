@@ -1,14 +1,26 @@
-import sys, os
-sys.path.append(os.path.abspath(os.path.dirname(__file__)))
-import streamlit as st
-import pandas as pd
-import numpy as np
 import os
+import streamlit as st
+import traceback
 
-st.write("📂 Current working directory:", os.getcwd())
-st.write("📄 Script directory:", os.path.dirname(__file__))
-st.write("📊 Expected CSV path:", SIGNALS_CSV)
-st.write("🟢 File exists?", os.path.exists(SIGNALS_CSV))
+st.title("Preflight Debug Check")
+
+# Show current working directory and files
+st.write("Current working directory:", os.getcwd())
+st.write("Files in this folder:", os.listdir(os.path.dirname(__file__)))
+
+# Test import of utils
+try:
+    import utils
+    st.success("✅ utils imported successfully")
+except Exception as e:
+    st.error("❌ Failed to import utils")
+    st.code(traceback.format_exc())
+
+# Test CSV
+csv_path = os.path.join(os.path.dirname(__file__), "stock_buy_signals_ML.csv")
+st.write("Looking for CSV at:", csv_path)
+st.write("CSV exists?", os.path.exists(csv_path))
+
 
 @st.cache_data(ttl=3600)
 def load_data():
