@@ -28,18 +28,11 @@ except Exception as e:
 
 # Test CSV
 csv_path = os.path.join(os.path.dirname(__file__), "stock_buy_signals_ML.csv")
-st.write("Looking for CSV at:", csv_path)
-st.write("CSV exists?", os.path.exists(csv_path))
 
 
 @st.cache_data(ttl=3600)
 def load_data():
     try:
-        # Step 1: Try reading just the first few rows for quick feedback
-        preview = pd.read_csv(csv_path, nrows=5)
-        st.write("✅ Preview of CSV (first 5 rows):")
-        st.dataframe(preview)
-
         # Step 2: Load full dataset
         df_all = pd.read_csv(csv_path)
         st.write("✅ Full CSV loaded successfully with shape:", df_all.shape)
