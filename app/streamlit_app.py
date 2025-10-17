@@ -6,17 +6,22 @@ import numpy as np
 import os
 from sqlalchemy import create_engine
 import psycopg2
-from utils import (
-    bucket_probabilities_quantile,
-    add_logo_html,
-    render_logo_table,
-    plot_bucket_curves_plotly,
-    compute_forward_returns,
-    summarize_buckets,
-    trim_to_common_dates,
-    HORIZONS,
-    COLOR_MAP
-)
+try:
+    from utils import (
+        bucket_probabilities_quantile,
+        add_logo_html,
+        render_logo_table,
+        plot_bucket_curves_plotly,
+        compute_forward_returns,
+        summarize_buckets,
+        HORIZONS,
+        COLOR_MAP
+    )
+    st.success("✅ utils.py imported successfully!")
+except Exception as e:
+    st.error(f"❌ Failed to import utils: {e}")
+
+
 
 # Path to project output folder
 SIGNALS_CSV = os.path.join(os.path.dirname(__file__), "stock_buy_signals_ML.csv")
