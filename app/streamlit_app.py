@@ -23,10 +23,14 @@ csv_path = os.path.join(os.path.dirname(__file__), "stock_buy_signals_ML.csv")
 def load_data():
     df_all = pd.read_csv(csv_path)
 
-    # Step 4: Try parsing date and sorting
+    # Parse date column if it exists
     if 'date' in df_all.columns:
         df_all['date'] = pd.to_datetime(df_all['date'], errors='coerce')
 
+        # Keep only rows with date in 2024 or later
+        df_all = df_all[df_all['date'].dt.year >= 2024]
+
+    # Sort by symbol and date
     df_all = df_all.sort_values(['symbol', 'date']).reset_index(drop=True)
     return df_all
 
