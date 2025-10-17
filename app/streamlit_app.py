@@ -8,23 +8,17 @@ st.title("Preflight Debug Check")
 st.write("Current working directory:", os.getcwd())
 st.write("Files in this folder:", os.listdir(os.path.dirname(__file__)))
 
-# Test import of utils
-try:
-    from utils import (
-        bucket_probabilities_quantile,
-        add_logo_html,
-        render_logo_table,
-        plot_bucket_curves_plotly,
-        compute_forward_returns,
-        summarize_buckets,
-        trim_to_common_dates,
-        HORIZONS,
-        COLOR_MAP
-    ) 
-    st.success("✅ utils imported successfully")
-except Exception as e:
-    st.error("❌ Failed to import utils")
-    st.code(traceback.format_exc())
+from utils import (
+    bucket_probabilities_quantile,
+    add_logo_html,
+    render_logo_table,
+    plot_bucket_curves_plotly,
+    compute_forward_returns,
+    summarize_buckets,
+    trim_to_common_dates,
+    HORIZONS,
+    COLOR_MAP
+) 
 
 # Test CSV
 csv_path = os.path.join(os.path.dirname(__file__), "stock_buy_signals_ML.csv")
@@ -32,31 +26,14 @@ csv_path = os.path.join(os.path.dirname(__file__), "stock_buy_signals_ML.csv")
 
 @st.cache_data(ttl=3600)
 def load_data():
-    try:
-        # Step 2: Load full dataset
-        df_all = pd.read_csv(csv_path)
-        st.write("✅ Full CSV loaded successfully with shape:", df_all.shape)
+    df_all = pd.read_csv(csv_path)
 
-        # Step 3: Check for missing / unexpected columns
-        expected_cols = ['symbol', 'date']
-        missing = [col for col in expected_cols if col not in df_all.columns]
-        if missing:
-            st.warning(f"⚠️ Missing expected columns: {missing}")
+    # Step 4: Try parsing date and sorting
+    if 'date' in df_all.columns:
+        df_all['date'] = pd.to_datetime(df_all['date'], errors='coerce')
 
-        # Step 4: Try parsing date and sorting
-        if 'date' in df_all.columns:
-            df_all['date'] = pd.to_datetime(df_all['date'], errors='coerce')
-            if df_all['date'].isna().any():
-                st.warning("⚠️ Some 'date' values could not be parsed and were set to NaT")
-
-        df_all = df_all.sort_values(['symbol', 'date']).reset_index(drop=True)
-        return df_all
-
-    except Exception as e:
-        import traceback
-        st.error("❌ Failed to load CSV.")
-        st.code(traceback.format_exc())  # full traceback for debugging
-        return pd.DataFrame()
+    df_all = df_all.sort_values(['symbol', 'date']).reset_index(drop=True)
+    return df_all
 
 @st.cache_data(ttl=3600)
 def get_bucket_summary(df, prob_col, bucket_col, max_days):
