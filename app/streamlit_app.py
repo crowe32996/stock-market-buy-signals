@@ -15,7 +15,7 @@ from utils import (
 ) 
 
 # Test CSV
-csv_path = os.path.join(os.path.dirname(__file__), "stock_buy_signals_ML.csv")
+csv_path = os.path.join(os.path.dirname(__file__), "..", "/outputs/stock_buy_signals_ML.csv")
 
 
 @st.cache_data(ttl=3600)
