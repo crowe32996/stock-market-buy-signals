@@ -10,7 +10,17 @@ st.write("Files in this folder:", os.listdir(os.path.dirname(__file__)))
 
 # Test import of utils
 try:
-    import utils
+    from utils import (
+        bucket_probabilities_quantile,
+        add_logo_html,
+        render_logo_table,
+        plot_bucket_curves_plotly,
+        compute_forward_returns,
+        summarize_buckets,
+        trim_to_common_dates,
+        HORIZONS,
+        COLOR_MAP
+    ) 
     st.success("✅ utils imported successfully")
 except Exception as e:
     st.error("❌ Failed to import utils")
@@ -26,12 +36,12 @@ st.write("CSV exists?", os.path.exists(csv_path))
 def load_data():
     try:
         # Step 1: Try reading just the first few rows for quick feedback
-        preview = pd.read_csv(SIGNALS_CSV, nrows=5)
+        preview = pd.read_csv(csv_path, nrows=5)
         st.write("✅ Preview of CSV (first 5 rows):")
         st.dataframe(preview)
 
         # Step 2: Load full dataset
-        df_all = pd.read_csv(SIGNALS_CSV)
+        df_all = pd.read_csv(csv_path)
         st.write("✅ Full CSV loaded successfully with shape:", df_all.shape)
 
         # Step 3: Check for missing / unexpected columns
