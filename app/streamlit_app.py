@@ -1,7 +1,7 @@
 import os
 import streamlit as st
 import traceback
-
+import pandas as pd
 st.title("Preflight Debug Check")
 
 # Show current working directory and files
