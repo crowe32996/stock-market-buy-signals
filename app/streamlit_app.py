@@ -2,6 +2,7 @@ import os
 import streamlit as st
 import traceback
 import pandas as pd
+
 from utils import (
     bucket_probabilities_quantile,
     add_logo_html,
@@ -15,7 +16,7 @@ from utils import (
 ) 
 
 # Test CSV
-csv_path = os.path.join(os.path.dirname(__file__), "..", "/outputs/stock_buy_signals_ML.csv")
+csv_path = os.path.join(os.path.dirname(__file__), "stock_buy_signals_ML.csv")
 
 
 @st.cache_data(ttl=3600)
