@@ -10,17 +10,7 @@ st.write("Files in this folder:", os.listdir(os.path.dirname(__file__)))
 
 # Test import of utils
 try:
-    from utils import (
-        bucket_probabilities_quantile,
-        add_logo_html,
-        render_logo_table,
-        plot_bucket_curves_plotly,
-        compute_forward_returns,
-        summarize_buckets,
-        trim_to_common_dates,
-        HORIZONS,
-        COLOR_MAP
-    ) 
+    import utils
     st.success("✅ utils imported successfully")
 except Exception as e:
     st.error("❌ Failed to import utils")
