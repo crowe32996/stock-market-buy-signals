@@ -2,6 +2,11 @@ import os
 import streamlit as st
 import traceback
 import pandas as pd
+st.title("Preflight Debug Check")
+
+# Show current working directory and files
+st.write("Current working directory:", os.getcwd())
+st.write("Files in this folder:", os.listdir(os.path.dirname(__file__)))
 
 from utils import (
     bucket_probabilities_quantile,
@@ -29,6 +34,7 @@ def load_data():
 
     df_all = df_all.sort_values(['symbol', 'date']).reset_index(drop=True)
     return df_all
+
 
 @st.cache_data(ttl=3600)
 def get_bucket_summary(df, prob_col, bucket_col, max_days):
